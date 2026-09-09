@@ -1,0 +1,51 @@
+{
+  "advisory_id": "2026-09-07T13:47:03Z_F01",
+  "schema_version": "1.0",
+  "field_id": "F01",
+  "generated_at_utc": "2026-09-07T13:47:03Z",
+  "generated_by": { "device": "jetson-nano-01", "gps_time_valid": true },
+  "flight": { "started_utc": "2026-09-07T13:15:44Z", "survey_images": 83, "inspection_images": 27 },
+  "inputs": [
+    { "name": "mast_thermal", "source_node": "07", "latest_sample_utc": "1970-01-01T04:12:00Z", "age_hours": 0.9, "status": "OK", "rtc_valid": false },
+    { "name": "ambient", "source_node": "07", "latest_sample_utc": "1970-01-01T04:16:00Z", "age_hours": 0.8, "status": "OK", "rtc_valid": false },
+    { "name": "sticky_trap", "source_node": "07", "latest_sample_utc": "1970-01-01T02:00:00Z", "age_hours": 3.1, "status": "OK", "rtc_valid": false }
+  ],
+  "vegetation": {
+    "vari": { "mean": 0.32, "p10": 0.14, "p90": 0.45, "source": "measured" },
+    "exg": { "mean": 0.29, "source": "measured" },
+    "tgi": { "mean": 14.6, "source": "measured" },
+    "dgci": { "mean": 0.62, "out_of_domain_fraction": 0.03, "source": "measured" },
+    "ndvi": null,
+    "ndvi_status": "PENDING_HARDWARE_FINALIZATION",
+    "ndvi_reason": "Optical path and calib_matrix in progress. Field reserved; not estimated."
+  },
+  "disease": [],
+  "pest": [
+    {
+      "taxon": "sugarcane_whitefly",
+      "count_per_trap_per_day": null,
+      "count_raw": 38,
+      "count_status": "INSUFFICIENT_WINDOW",
+      "threshold": 100,
+      "threshold_source": "NIPHM Sugarcane.pdf p.11",
+      "threshold_confirmed": true,
+      "status": "UNKNOWN",
+      "trend": "INSUFFICIENT_HISTORY",
+      "input_age_hours": 3.1,
+      "source": "measured"
+    }
+  ],
+  "water": {
+    "cwsi": null,
+    "cwsi_status": "EXCLUDED_RTC_INVALID",
+    "cwsi_reason": "Node 07 reports rtc_valid:false. Thermal timestamps cannot be placed in the diurnal cycle, so these frames are excluded from CWSI rather than used.",
+    "fao56": { "depletion_mm": null, "ks": null, "status": "BALANCE_NOT_SEEDED", "source": "derived" }
+  },
+  "actions": [
+    { "rank": 1, "action": "Replace the RTC backup battery on node 07", "rationale": "The node booted to 1970 — its DS3231 has lost power. Every record it has produced since then carries a timestamp that cannot be trusted, and CWSI is unavailable until it is fixed.", "confidence": "high", "advisory_only": true }
+  ],
+  "notes": [
+    "Irrigation actuation is out of scope. All actions are advisory.",
+    "All node timestamps in this advisory are unreliable. Nothing time-dependent was computed from them."
+  ]
+}

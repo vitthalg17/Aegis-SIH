@@ -1,0 +1,54 @@
+{
+  "advisory_id": "2026-09-05T14:58:29Z_F02",
+  "schema_version": "1.0",
+  "field_id": "F02",
+  "generated_at_utc": "2026-09-05T14:58:29Z",
+  "generated_by": { "device": "jetson-nano-01", "gps_time_valid": false },
+  "flight": { "started_utc": "2026-09-05T14:20:11Z", "survey_images": 76, "inspection_images": 33 },
+  "inputs": [
+    { "name": "mast_thermal", "source_node": "07", "latest_sample_utc": "2026-09-05T13:40:00Z", "age_hours": 1.3, "status": "OK", "rtc_valid": true },
+    { "name": "ambient", "source_node": "07", "latest_sample_utc": "2026-09-05T14:50:00Z", "age_hours": 0.1, "status": "OK", "rtc_valid": true },
+    { "name": "sticky_trap", "source_node": "07", "latest_sample_utc": "2026-09-03T08:00:00Z", "age_hours": 54.5, "status": "STALE", "rtc_valid": true }
+  ],
+  "vegetation": {
+    "vari": { "mean": 0.18, "p10": 0.02, "p90": 0.34, "source": "measured" },
+    "exg": { "mean": 0.16, "source": "measured" },
+    "tgi": { "mean": 8.4, "source": "measured" },
+    "dgci": { "mean": 0.44, "out_of_domain_fraction": 0.19, "source": "measured" },
+    "ndvi": null,
+    "ndvi_status": "PENDING_HARDWARE_FINALIZATION",
+    "ndvi_reason": "Optical path and calib_matrix in progress. Field reserved; not estimated."
+  },
+  "disease": [
+    { "class": "wheat_yellow_rust", "confidence": 0.63, "n_inspection_crops": 11, "source": "provisional" }
+  ],
+  "pest": [
+    {
+      "taxon": "wheat_aphid",
+      "count_per_trap_per_day": 118,
+      "count_raw": 268,
+      "count_status": "OK",
+      "threshold": 90,
+      "threshold_source": "PROVISIONAL_internal_estimate — no ICAR/NIPHM citation located",
+      "threshold_confirmed": false,
+      "status": "ABOVE_THRESHOLD",
+      "trend": "RISING",
+      "input_age_hours": 54.5,
+      "source": "measured"
+    }
+  ],
+  "water": {
+    "cwsi": 0.61,
+    "cwsi_status": "OK",
+    "fao56": { "depletion_mm": 44.2, "ks": 0.71, "status": "OK", "source": "derived" }
+  },
+  "actions": [
+    { "rank": 1, "action": "Irrigate F02 — CWSI 0.61 with Ks 0.71", "rationale": "Both the thermal and the water-balance route agree that F02 is under stress. This is the highest-confidence call in this advisory.", "confidence": "high", "advisory_only": true },
+    { "rank": 2, "action": "Re-count the F02 trap before acting on the aphid reading", "rationale": "Count is above threshold, but the threshold is an internal estimate with no citation and the trap image is 54.5 h old. Confirm both before treating.", "confidence": "low", "advisory_only": true }
+  ],
+  "notes": [
+    "Irrigation actuation is out of scope. All actions are advisory.",
+    "The aphid threshold in this advisory is provisional and uncited. Do not treat it as an ICAR figure.",
+    "GPS time was not valid on the Jetson for this flight; generated_at_utc is from the system clock."
+  ]
+}
