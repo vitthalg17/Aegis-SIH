@@ -10,3 +10,9 @@ expo-env.d.ts
 
 *.log
 .DS_Store
+
+# Local config. The LLM tier reads an API key from here (see README), and an
+# EXPO_PUBLIC_ key is a real credential even though it ends up in the bundle.
+.env
+.env.*
+!.env.example

@@ -12,6 +12,7 @@
     "station": "node tools/fake-field-station.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.125.0",
     "@expo-google-fonts/montserrat": "^0.4.2",
     "@expo-google-fonts/source-code-pro": "^0.4.1",
     "expo": "~57.0.21",

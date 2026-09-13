@@ -50,6 +50,7 @@ it just connected to.
 | `src/sync/client.ts` | The delta pull: cursor → manifest → fetch → ack. |
 | `src/sync/network.ts` | The §14.1 platform boundary. All of it, in one file. |
 | `src/ui/` | Renderer primitives and advisory blocks. |
+| `src/llm/` | The fourth tier: the advisory explained in plain language. |
 | `app/` | Three screens: history, advisory, field station. |
 | `tools/fake-field-station.mjs` | A fake Jetson, so the delta pull is testable with no hardware. |
 
@@ -91,6 +92,54 @@ MEASUREMENT** wherever they appear. `origin` is a three-way distinction —
 `synced` / `replay` / `fixture` — because §13.0.1 forbids presenting replayed or
 invented history as live measurement, and those are three different claims.
 
+## The fourth tier — the advisory in plain language
+
+`src/llm/` turns a stored advisory into a few paragraphs a farmer can act on, in
+English or Hindi. It is **purely additive** and the field path does not touch it:
+the advisory is pulled, validated, stored and rendered before this runs, and if
+it never runs the app is exactly what it was. `actions[]` still comes from the
+Jetson, deterministically, and is rendered above this block. **This explains
+those actions; it does not replace them.**
+
+Generated text is cached in SQLite per (advisory, language), so it is written
+once in whatever window the phone has signal and read afterwards in the field
+with no connection at all.
+
+### The guard is the point
+
+`src/llm/guard.ts` extracts every numeric token from the generated text and
+requires each one to appear in the source advisory. An explanation that invents
+a dose, a price, or a day count is **discarded and never shown** — the UI reports
+the refusal and names the invented figure.
+
+Everything else here exists to stop an unmeasured number reaching a farmer, and
+§14.3 calls the app the last place a fabricated one can be caught. A model
+writing the final prose is the first place in the whole system where one can be
+*created*. It would be a strange place to stop being careful.
+
+The check is deliberately blunt and will occasionally refuse a fine explanation.
+That trade is the right way round: a refused explanation costs a retry, a
+fabricated dose costs a crop. 18 tests in `guard.test.ts`, including that it
+actually fires — a guard never seen to reject anything is not a guard.
+
+### Configuring it
+
+Nothing is configured by default and the app says so rather than failing oddly.
+Pick one:
+
+```bash
+# Preferred — the key stays on a server you control.
+EXPO_PUBLIC_AEGIS_LLM_PROXY=https://your-proxy.example/v1
+
+# Demo-week alternative — the key is compiled into the bundle and is
+# extractable from the APK by anyone who downloads it. EXPO_PUBLIC_ is Expo's
+# marker for "inlined into the bundle", which is a usefully blunt name for it.
+EXPO_PUBLIC_ANTHROPIC_API_KEY=sk-ant-...
+```
+
+Model is `claude-opus-5` at medium effort. One call per advisory per language,
+not per screen.
+
 ## Two platform gotchas (§14.1)
 
 **Android.** Joined to a WiFi network with no internet, Android keeps the
@@ -118,9 +167,11 @@ reported as a permissions problem rather than an unreachable server.
 
 - The Android network-binding native module and its config plugin.
 - `GET /api/v1/media/<id>` — inspection crops, trap images, index maps.
-- Opportunistic Supabase upstream. The field path stays fully offline; if the
-  phone later reaches internet, it pushes a copy up as a fourth, purely additive
-  tier. Nothing in the field path may depend on it.
+- A live call against the real API. The guard, the prompt, the cache and the
+  screen are all written and typecheck clean, but no request has been made from
+  this machine — there is no key configured here. First run needs a human.
+- Localisation of the app's own fixed strings. The generated explanation already
+  speaks Hindi; the UI around it does not.
 - Multi-field and multi-node UI. Single node, single field, per §13.
 
 ## Stack

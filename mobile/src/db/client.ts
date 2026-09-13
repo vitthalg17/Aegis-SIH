@@ -48,6 +48,20 @@ const MIGRATIONS: string[] = [
     value TEXT
   );
   `,
+  // v2 — cached LLM explanations (F1). Separate table on purpose: this is the
+  // fourth, additive tier, and it must be droppable without touching a single
+  // measured value. Nothing in `advisories` references it.
+  `
+  CREATE TABLE IF NOT EXISTS explanations (
+    advisory_id      TEXT NOT NULL,
+    language         TEXT NOT NULL,
+    text             TEXT NOT NULL,
+    model            TEXT NOT NULL,
+    generated_at_utc TEXT NOT NULL,
+    PRIMARY KEY (advisory_id, language),
+    FOREIGN KEY (advisory_id) REFERENCES advisories (advisory_id) ON DELETE CASCADE
+  );
+  `,
 ];
 
 /** Opens the replica and brings it up to the current schema version. */
@@ -103,5 +117,7 @@ export async function setState(key: SyncKey, value: string | null): Promise<void
 /** Test/demo affordance: wipe the replica and start from nothing synced. */
 export async function resetReplica(): Promise<void> {
   const db = await getDb();
-  await db.execAsync('DELETE FROM advisories; DELETE FROM sync_state;');
+  await db.execAsync(
+    'DELETE FROM explanations; DELETE FROM advisories; DELETE FROM sync_state;',
+  );
 }

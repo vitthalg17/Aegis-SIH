@@ -24,6 +24,7 @@ import {
   WaterCard,
 } from '../../src/ui/advisory.tsx';
 import { Card, Muted, Row } from '../../src/ui/components.tsx';
+import { ExplanationCard } from '../../src/ui/explanation.tsx';
 import { useStatusBarStyle } from '../../src/ui/status-bar.ts';
 import { color, space, type } from '../../src/ui/theme.ts';
 
@@ -68,6 +69,11 @@ export default function AdvisoryScreen() {
       <InputsCard inputs={a.inputs} />
 
       <ActionsCard actions={a.actions} />
+
+      {/* After the Jetson's own actions, never instead of them. The measured
+          advice is what a farmer gets with no connection; this explains it. */}
+      <ExplanationCard advisory={a} />
+
       <WaterCard water={a.water} />
       <PestCard pest={a.pest} />
       <DiseaseCard disease={a.disease} />
