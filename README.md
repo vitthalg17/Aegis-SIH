@@ -11,7 +11,7 @@ only the coordinates it flagged at 3–5 m for close-up confirmation. Segmentati
 runs on the aircraft, the orthomosaic builds on the field station, and no step of
 the pipeline waits on connectivity.
 
-This repository holds the project website.
+This repository holds the project website and the farmer's phone app.
 
 ## Running the site
 
@@ -36,9 +36,27 @@ web/                    the Next.js site
     ui/                 shared primitives + the AEGIS wordmark
   lib/content.ts        every string on the landing page
   lib/team.ts           the roster
+mobile/                 the farmer's phone app (Expo / React Native)
+  src/schema/           the §7.3 advisory contract + its validator
+  fixtures/             five sample advisories, four of them degraded
+  src/db/               SQLite replica and sync cursor
+  src/sync/             delta pull + the §14.1 platform boundary
+  app/                  routes: history, advisory, field station
 design/                 design mockups (.dc.html artboards + canvas)
+data_flow_architecture.md   connectivity + data flow, the app's spec
 SIH_2026_AEGIS_Presentation.pptx
 ```
+
+## Running the app
+
+```bash
+cd mobile
+npm install
+npm start
+```
+
+See `mobile/README.md`. It runs with no drone, no field station and no network —
+the local replica is seeded with sample advisories, labelled as such.
 
 **All copy lives in `lib/content.ts`.** Every claim, figure and spec there comes
 from the presentation. The one exception is the demo advisory card, which is
