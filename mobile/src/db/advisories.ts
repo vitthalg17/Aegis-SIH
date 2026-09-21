@@ -1,22 +1,23 @@
 /**
  * Reading and writing advisories in the replica.
  *
- * Ingest is the one place an advisory enters the app, and it is where the §7.3
- * validator runs. Everything downstream of here can assume it knows whether the
- * record it is holding is trustworthy, because the answer is stored beside it.
+ * Ingest is the one place an advisory enters the app, and it is where the
+ * validator runs. Everything downstream can assume it knows whether the record
+ * it is holding is trustworthy, because the answer is stored beside it.
  */
 
-import type { Advisory } from '../schema/advisory.ts';
+import type { Advisory, CropHealthState, InferenceBackend } from '../schema/advisory.ts';
+import { fieldIdFromAdvisoryId, isReplay } from '../schema/advisory.ts';
 import type { Violation } from '../schema/validate.ts';
 import { validateAdvisory } from '../schema/validate.ts';
 import { getDb } from './client.ts';
 
 /**
- * Where a stored advisory came from. These are three different claims about
- * reality and §13.0.1 forbids merging them: a judge who sees unlabelled sample
- * data has found failure pattern #1 in the demo itself.
+ * Where a stored advisory came from. These are four different claims about
+ * reality and the UI must not merge them: a judge who sees unlabelled sample
+ * data has found the project's own worst failure mode inside the demo.
  */
-export type AdvisoryOrigin = 'synced' | 'replay' | 'fixture';
+export type AdvisoryOrigin = 'synced' | 'replay' | 'fixture' | 'imported';
 
 /** An advisory as the app handles it: the payload plus what we know about it. */
 export type StoredAdvisory = {
@@ -30,15 +31,35 @@ export type StoredAdvisory = {
 /** The listing row — enough to render a card without parsing the full JSON. */
 export type AdvisorySummary = {
   advisoryId: string;
-  fieldId: string;
+  seq: number | null;
+  /** Parsed off the advisory_id suffix when it has one. Display only. */
+  fieldId: string | null;
   generatedAtUtc: string;
   valid: boolean;
   violationCount: number;
   origin: AdvisoryOrigin;
+  /**
+   * The verdict, lifted out for the list. Null on a record too malformed to
+   * carry one — which is itself worth seeing in the list rather than only after
+   * tapping through.
+   */
+  state: CropHealthState | null;
+  /** The crop the scan settled on, or null when it could not pick one. */
+  crop: string | null;
+  /**
+   * The leading finding, for the row headline. Contract v1.0 dropped
+   * `crop_health.class`, so this is the highest-confidence entry in
+   * `disease[]` — which is what that field used to hold anyway.
+   */
+  topClass: string | null;
+  inferenceBackend: InferenceBackend | null;
+  /** The raw stamp, before it was resolved into `origin`. */
+  replay: boolean;
 };
 
 type Row = {
   advisory_id: string;
+  seq: number | null;
   field_id: string;
   generated_at_utc: string;
   schema_version: string;
@@ -47,15 +68,46 @@ type Row = {
   violations: string | null;
   origin: AdvisoryOrigin;
   received_at_utc: string;
+  inference_backend: string | null;
+  replay: number | null;
 };
+
+/**
+ * Ordering, in one place.
+ *
+ * `seq` is the pod's commit order and is the only thing that orders these
+ * safely — the pod has no battery-backed clock, so generated_at_utc can jump
+ * backwards across a reboot through no fault of anyone's. Records without a seq
+ * (an imported file, an older pod) fall back to the timestamp and sort after
+ * everything that has one.
+ */
+const ORDER = 'ORDER BY seq IS NULL, seq DESC, generated_at_utc DESC';
+
+const COLUMNS =
+  'advisory_id, seq, field_id, generated_at_utc, schema_version, json, ' +
+  'valid, violations, origin, received_at_utc, inference_backend, replay';
+
+/**
+ * The strongest finding in an advisory, for the listing row.
+ *
+ * `disease[]` is ordered by the pod but not guaranteed to be, so this picks by
+ * confidence rather than trusting position. Returns null on an empty list,
+ * which is the normal case for a healthy scan and must not be confused with a
+ * missing block.
+ */
+export function topFinding(advisory: Advisory | undefined): string | null {
+  const disease = advisory?.disease;
+  if (!Array.isArray(disease) || disease.length === 0) return null;
+  return disease.reduce((a, b) => (b.confidence > a.confidence ? b : a)).class ?? null;
+}
 
 /**
  * Stores one advisory, validating it on the way in.
  *
  * A failing advisory is stored with its violations rather than rejected. The
- * app is the last place a fabricated number can be caught (§14.3) — catching it
- * and then throwing the evidence away would defeat the point. The renderer
- * shows the violations; it does not pretend the record is fine.
+ * app is the last place a fabricated number can be caught — catching it and
+ * then throwing the evidence away would defeat the point. The renderer shows
+ * the violations; it does not pretend the record is fine.
  */
 export async function ingestAdvisory(
   raw: unknown,
@@ -68,21 +120,35 @@ export async function ingestAdvisory(
     throw new Error('advisory has no advisory_id — cannot be stored or acknowledged');
   }
 
-  const origin: AdvisoryOrigin = opts.origin ?? (a.replay ? 'replay' : 'synced');
+  /**
+   * Provenance, resolved the safe way round.
+   *
+   * `isReplay` treats a *missing* replay field as true, not false. The failure
+   * worth guarding against is a seeded record labelled live, not a live record
+   * labelled seeded — so if the pod ever ships a bug that drops the field, the
+   * app under-claims rather than over-claims. An explicit caller-supplied
+   * origin still wins, because a fixture knows what it is.
+   */
+  const replay = isReplay(a);
+  const origin: AdvisoryOrigin = opts.origin ?? (replay ? 'replay' : 'synced');
   const db = await getDb();
 
   await db.runAsync(
     `INSERT INTO advisories
-       (advisory_id, field_id, generated_at_utc, schema_version, json,
-        valid, violations, origin, received_at_utc)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       (advisory_id, seq, field_id, generated_at_utc, schema_version, json,
+        valid, violations, origin, received_at_utc, inference_backend, replay)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(advisory_id) DO UPDATE SET
+       seq = excluded.seq,
        json = excluded.json,
        valid = excluded.valid,
        violations = excluded.violations,
-       origin = excluded.origin`,
+       origin = excluded.origin,
+       inference_backend = excluded.inference_backend,
+       replay = excluded.replay`,
     a.advisory_id,
-    a.field_id ?? 'unknown',
+    typeof a.seq === 'number' ? a.seq : null,
+    fieldIdFromAdvisoryId(a.advisory_id) ?? '',
     a.generated_at_utc ?? new Date(0).toISOString(),
     a.schema_version ?? 'unknown',
     JSON.stringify(raw),
@@ -90,9 +156,40 @@ export async function ingestAdvisory(
     violations.length ? JSON.stringify(violations) : null,
     origin,
     new Date().toISOString(),
+    typeof a.inference_backend === 'string' ? a.inference_backend : null,
+    replay ? 1 : 0,
   );
 
   return { advisoryId: a.advisory_id, valid: ok, violations };
+}
+
+/**
+ * Ingests an advisory that came from a file rather than from a pod.
+ *
+ * This is the insurance against the SIH-FIELD access point not landing: the pod
+ * can write every advisory to disk as plain JSON, and the demo survives on a
+ * file transfer even if no socket ever reaches the pod. It is stored under its
+ * own origin because "someone put this file on the phone" is a weaker claim
+ * about where a number came from than "the phone pulled it off the pod", and
+ * the screen says so.
+ */
+export async function importAdvisoryFromText(
+  text: string,
+): Promise<{ advisoryId: string; valid: boolean; violations: Violation[] }> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (err) {
+    throw new Error(
+      `That is not valid JSON, so it was not imported. (${err instanceof Error ? err.message : String(err)})`,
+    );
+  }
+  // A file containing a manifest or an array of advisories is a plausible
+  // mistake to make; say which shape is wanted rather than failing obscurely.
+  if (Array.isArray(parsed)) {
+    throw new Error('That file holds a list. Import one advisory at a time.');
+  }
+  return ingestAdvisory(parsed, { origin: 'imported' });
 }
 
 const toStored = (row: Row): StoredAdvisory => ({
@@ -106,27 +203,41 @@ const toStored = (row: Row): StoredAdvisory => ({
 export async function listAdvisories(limit = 100): Promise<AdvisorySummary[]> {
   const db = await getDb();
   const rows = await db.getAllAsync<Row>(
-    `SELECT advisory_id, field_id, generated_at_utc, schema_version, json,
-            valid, violations, origin, received_at_utc
-       FROM advisories
-      ORDER BY generated_at_utc DESC
-      LIMIT ?`,
+    `SELECT ${COLUMNS} FROM advisories ${ORDER} LIMIT ?`,
     limit,
   );
-  return rows.map((r) => ({
-    advisoryId: r.advisory_id,
-    fieldId: r.field_id,
-    generatedAtUtc: r.generated_at_utc,
-    valid: r.valid === 1,
-    violationCount: r.violations ? (JSON.parse(r.violations) as Violation[]).length : 0,
-    origin: r.origin,
-  }));
+  return rows.map((r) => {
+    // The full payload is stored verbatim in one column, so the verdict is a
+    // parse away rather than a column of its own. At this scale — a handful of
+    // advisories per field per day — that is cheaper than another migration.
+    let advisory: Advisory | undefined;
+    try {
+      advisory = JSON.parse(r.json) as Advisory;
+    } catch {
+      // A row whose JSON will not parse still belongs in the list, flagged.
+    }
+    return {
+      advisoryId: r.advisory_id,
+      seq: r.seq,
+      fieldId: r.field_id || null,
+      generatedAtUtc: r.generated_at_utc,
+      valid: r.valid === 1,
+      violationCount: r.violations ? (JSON.parse(r.violations) as Violation[]).length : 0,
+      origin: r.origin,
+      state: advisory?.crop_health?.state ?? null,
+      crop: advisory?.crop_health?.crop ?? null,
+      topClass: topFinding(advisory),
+      inferenceBackend: (r.inference_backend as InferenceBackend | null) ?? null,
+      // Stored rows predating the column read as replay, matching `isReplay`.
+      replay: r.replay === null ? true : r.replay === 1,
+    };
+  });
 }
 
 export async function getAdvisory(advisoryId: string): Promise<StoredAdvisory | null> {
   const db = await getDb();
   const row = await db.getFirstAsync<Row>(
-    'SELECT * FROM advisories WHERE advisory_id = ?',
+    `SELECT ${COLUMNS} FROM advisories WHERE advisory_id = ?`,
     advisoryId,
   );
   return row ? toStored(row) : null;
@@ -134,9 +245,7 @@ export async function getAdvisory(advisoryId: string): Promise<StoredAdvisory | 
 
 export async function getLatestAdvisory(): Promise<StoredAdvisory | null> {
   const db = await getDb();
-  const row = await db.getFirstAsync<Row>(
-    'SELECT * FROM advisories ORDER BY generated_at_utc DESC LIMIT 1',
-  );
+  const row = await db.getFirstAsync<Row>(`SELECT ${COLUMNS} FROM advisories ${ORDER} LIMIT 1`);
   return row ? toStored(row) : null;
 }
 
@@ -149,8 +258,86 @@ export async function countAdvisories(): Promise<number> {
 /** Advisory ids the replica already holds — the input to the delta pull. */
 export async function knownAdvisoryIds(): Promise<Set<string>> {
   const db = await getDb();
-  const rows = await db.getAllAsync<{ advisory_id: string }>(
-    'SELECT advisory_id FROM advisories',
-  );
+  const rows = await db.getAllAsync<{ advisory_id: string }>('SELECT advisory_id FROM advisories');
   return new Set(rows.map((r) => r.advisory_id));
+}
+
+/**
+ * The highest pod sequence number this replica holds.
+ *
+ * Used to recover the cursor when it is missing or behind — after a reinstall,
+ * or after an import — so the next pull asks for the right window instead of
+ * refetching everything or, worse, skipping a gap.
+ */
+export async function highestSeq(): Promise<number | null> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ n: number | null }>(
+    "SELECT MAX(seq) AS n FROM advisories WHERE origin != 'fixture'",
+  );
+  return row?.n ?? null;
+}
+
+/**
+ * Removes the shipped sample advisories, leaving everything real untouched.
+ *
+ * Only ever called with a fixture set that has gone stale. Invented data is not
+ * evidence of anything, so replacing it wholesale is safe in a way that
+ * discarding a synced record would not be.
+ */
+export async function deleteFixtures(): Promise<number> {
+  const db = await getDb();
+  const result = await db.runAsync("DELETE FROM advisories WHERE origin = 'fixture'");
+  return result.changes ?? 0;
+}
+
+/**
+ * Re-runs the validator over every stored advisory.
+ *
+ * The validator is the app's half of a contract that is still moving. When it
+ * changes, records already in the replica were checked against the old version
+ * and their stored verdict is stale — a record that passed last week can be one
+ * the current renderer cannot read, which is exactly how the advisory screen
+ * came to crash on a `crop_health` block that did not exist yet, and exactly
+ * what the move to wire contract v1.0 does to every record written before it.
+ *
+ * Re-validating on boot keeps the stored verdict honest. Nothing is deleted:
+ * a record that now fails is marked failing and rendered as failing, with its
+ * violations listed, which is the outcome the whole design is built around.
+ */
+export async function revalidateAll(): Promise<{ checked: number; nowInvalid: number }> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<{ advisory_id: string; json: string; valid: number }>(
+    'SELECT advisory_id, json, valid FROM advisories',
+  );
+
+  let nowInvalid = 0;
+  for (const row of rows) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(row.json);
+    } catch {
+      // Unparseable JSON in the replica is its own kind of broken. Mark it and
+      // move on rather than letting one bad row stop the boot.
+      await db.runAsync(
+        'UPDATE advisories SET valid = 0, violations = ? WHERE advisory_id = ?',
+        JSON.stringify([{ rule: 1, path: '$', message: 'stored payload is not valid JSON' }]),
+        row.advisory_id,
+      );
+      nowInvalid++;
+      continue;
+    }
+
+    const { ok, violations } = validateAdvisory(parsed);
+    if (!ok) nowInvalid++;
+    if ((row.valid === 1) === ok) continue; // verdict unchanged, skip the write
+
+    await db.runAsync(
+      'UPDATE advisories SET valid = ?, violations = ? WHERE advisory_id = ?',
+      ok ? 1 : 0,
+      violations.length ? JSON.stringify(violations) : null,
+      row.advisory_id,
+    );
+  }
+
+  return { checked: rows.length, nowInvalid };
 }

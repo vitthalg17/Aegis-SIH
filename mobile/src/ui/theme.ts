@@ -15,8 +15,15 @@ export const color = {
   foreground: '#3E2723',
   muted: '#F0E9E0',
   mutedForeground: '#6D4C41',
-  /** Third text level, below mutedForeground. Used for mono micro-labels. */
-  fgSubtle: '#9A7F77',
+  /**
+   * Third text level, below mutedForeground. Used for mono micro-labels.
+   *
+   * Darkened from #9A7F77, which measured 3.70:1 on the card surface — under
+   * the 4.5:1 needed for body text, and these are 10.5px labels, so the
+   * large-text allowance does not apply. This step holds the same warm hue and
+   * measures 4.98:1 on card, 4.58:1 on the page background.
+   */
+  fgSubtle: '#846A62',
   border: '#E0D6C9',
 
   primary: '#2E7D32',
@@ -56,6 +63,42 @@ export const color = {
   unknown: '#5B6570',
   unknownSurface: '#EEF1F4',
   unknownBorder: '#D6DDE4',
+} as const;
+
+/**
+ * Chart tokens.
+ *
+ * Almost nothing this app plots is *categorical*. A canopy-stress band, an
+ * input's freshness, a verdict — these are **status**: a small fixed scale with
+ * reserved meaning, running good → warning → serious. So the marks draw from
+ * the status palette above rather than from a series palette, and every one of
+ * them ships with a written label beside it. Colour is never the only channel.
+ *
+ * Each status gets a light step of its own hue for meter tracks, so an unfilled
+ * track reads as the same ramp as its fill rather than as dead grey.
+ */
+export const chart = {
+  /** Meter fills, in severity order. */
+  fill: {
+    good: color.primary,
+    warn: color.warning,
+    bad: color.destructive,
+    unknown: color.unknown,
+  },
+  /** The unfilled remainder of a meter: a lighter step of the fill's own hue. */
+  track: {
+    good: '#D7EBD8',
+    warn: '#F7E3C2',
+    bad: '#F7D8D4',
+    unknown: '#E4E9EE',
+  },
+  /** Hairline grid and axis rules. One shade off the surface, never dashed. */
+  grid: '#EDE5DA',
+  axis: '#DCD1C4',
+  /** De-emphasis: context marks that must recede behind the one that matters. */
+  muted: '#CFC3B4',
+  /** The gap punched between adjacent fills, in px. Never a stroke. */
+  gap: 2,
 } as const;
 
 export const font = {
@@ -110,6 +153,14 @@ export const type = {
   body: { fontFamily: font.sans, fontSize: 14.5, lineHeight: 24 },
   small: { fontFamily: font.sans, fontSize: 13, lineHeight: 18 },
   label: { fontFamily: font.sansMedium, fontSize: 13.5 },
+
+  /**
+   * The one number a screen leads with. Exactly one per view, in the same sans
+   * as everything else — a display face here reads as decoration — and with the
+   * font's proportional figures, because equal-width digits make a number like
+   * 121 look loose at this size.
+   */
+  hero: { fontFamily: font.sansBold, fontSize: 44, lineHeight: 48, letterSpacing: -1.4 },
 
   /** Big mono figure, as on the site's StatCard. */
   stat: { fontFamily: font.mono, fontSize: 26, letterSpacing: -0.5 },

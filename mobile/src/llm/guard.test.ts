@@ -22,7 +22,17 @@ const FIXTURE_DIR = fileURLToPath(new URL('../../fixtures/', import.meta.url).hr
 const fixture = (name: string): unknown =>
   JSON.parse(readFileSync(`${FIXTURE_DIR}${name}.json`, 'utf8'));
 
-const clean = fixture('advisory-clean');
+/** Every advisory we ship, including the one captured off the real device. */
+const FIXTURE_NAMES = [
+  'advisory-device-capture',
+  'advisory-healthy',
+  'advisory-failed-tier',
+  'advisory-recalled-dose',
+  'advisory-trap-above-etl',
+  'advisory-uncertain',
+];
+
+const healthy = fixture('advisory-healthy');
 
 // ---- canon ----------------------------------------------------------------
 
@@ -63,7 +73,7 @@ test('a ratio may be written back as a percentage', () => {
 });
 
 test('a percentage rendering is not permitted for values above 1', () => {
-  const allowed = allowedFigures({ depletion_mm: 21.4 });
+  const allowed = allowedFigures({ crop_et_mm_day: 21.4 });
   assert.ok(!allowed.has('2140'), '21.4 must not permit "2140"');
 });
 
@@ -72,13 +82,13 @@ test('a percentage rendering is not permitted for values above 1', () => {
 test('prose with no digits at all passes', () => {
   const result = checkFigures(
     'Your crop looks healthy. Keep watching the traps and water as usual.',
-    clean,
+    healthy,
   );
   assert.equal(result.ok, true);
 });
 
 test('quoting a figure that is in the advisory passes', () => {
-  const a = { pest: [{ count_per_trap_per_day: 42, threshold: 100 }] };
+  const a = { pest: [{ count_observed: 42, threshold_value: 100 }] };
   const result = checkFigures('Trap counts are at 42, well below the threshold of 100.', a);
   assert.equal(result.ok, true);
 });
@@ -97,17 +107,42 @@ test('bullet markers are stripped too', () => {
 // ---- checkFigures: the rejections that matter -----------------------------
 
 test('an invented dose is rejected', () => {
-  const result = checkFigures('Spray 2.5 ml per litre of water.', clean);
+  const result = checkFigures('Spray 7.5 ml per litre of water.', healthy);
   assert.equal(result.ok, false);
   if (result.ok) return;
   assert.deepEqual(
     result.offending.map((f) => f.raw),
-    ['2.5'],
+    ['7.5'],
   );
 });
 
+/**
+ * A property of the design that is worth pinning rather than discovering.
+ *
+ * The guard allows any figure the advisory contains, including ones inside
+ * prose — a citation, an accuracy note, a note to the farmer. That is
+ * deliberate: anything the advisory says, the explanation may repeat. But it
+ * means **every sentence of prose the pod adds widens the allow-list.**
+ *
+ * Every advisory carries "approximately 2.5 m CEP" in its GPS accuracy note, so
+ * 2.5 is a figure the model may legitimately write — including, in principle,
+ * as "2.5 ml per litre". The guard is a floor, not a ceiling: it stops figures
+ * appearing from nowhere, and the prompt is what stops a real figure being
+ * reused as something it is not.
+ *
+ * If this ever needs tightening, the move is to exclude free-prose fields from
+ * the allow-list, not to weaken what the model may quote.
+ */
+test('figures inside advisory prose widen what the model may write', () => {
+  assert.ok(
+    allowedFigures(healthy).has('2.5'),
+    'the GPS accuracy note puts 2.5 in the advisory, so the guard must allow it',
+  );
+  assert.equal(checkFigures('Fixes are good to about 2.5 m.', healthy).ok, true);
+});
+
 test('an invented day count is rejected', () => {
-  const a = { water: { cwsi: null, cwsi_days_remaining: 9 } };
+  const a = { pest: [{ days_monitored: 9 }] };
   const result = checkFigures('Irrigate within the next 3 days.', a);
   assert.equal(result.ok, false);
   if (result.ok) return;
@@ -115,7 +150,7 @@ test('an invented day count is rejected', () => {
 });
 
 test('an invented price is rejected', () => {
-  const result = checkFigures('Treatment costs about Rs 450 per acre.', clean);
+  const result = checkFigures('Treatment costs about Rs 450 per acre.', healthy);
   assert.equal(result.ok, false);
 });
 
@@ -140,7 +175,7 @@ test('a plausible-but-wrong version of a real figure is rejected', () => {
   // The advisory says 42. The model rounding it to 40 is still a number the
   // pipeline never produced, and this is exactly the quiet failure we care
   // about: it looks like a measurement and reads as one.
-  const a = { pest: [{ count_per_trap_per_day: 42 }] };
+  const a = { pest: [{ count_observed: 42 }] };
   const result = checkFigures('Trap counts are around 40.', a);
   assert.equal(result.ok, false);
   if (result.ok) return;
@@ -150,13 +185,7 @@ test('a plausible-but-wrong version of a real figure is rejected', () => {
 // ---- checkFigures against the real fixtures -------------------------------
 
 test('every fixture permits an explanation that quotes its own figures', () => {
-  for (const name of [
-    'advisory-clean',
-    'advisory-baseline-init',
-    'advisory-stale-trap',
-    'advisory-rtc-invalid',
-    'advisory-provisional-threshold',
-  ]) {
+  for (const name of FIXTURE_NAMES) {
     const a = fixture(name) as Record<string, unknown>;
     const allowed = allowedFigures(a);
     assert.ok(allowed.size > 0, `${name} produced no allowed figures`);
@@ -168,13 +197,7 @@ test('every fixture permits an explanation that quotes its own figures', () => {
 });
 
 test('an invented figure is caught in every fixture', () => {
-  for (const name of [
-    'advisory-clean',
-    'advisory-baseline-init',
-    'advisory-stale-trap',
-    'advisory-rtc-invalid',
-    'advisory-provisional-threshold',
-  ]) {
+  for (const name of FIXTURE_NAMES) {
     const a = fixture(name);
     // 999999 appears in none of them.
     const result = checkFigures('Apply 999999 units immediately.', a);
