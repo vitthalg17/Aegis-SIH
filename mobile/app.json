@@ -11,7 +11,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "in.sih.aegis",
       "infoPlist": {
-        "NSLocalNetworkUsageDescription": "AEGIS connects directly to the drone's field station over local Wi-Fi to collect advisories. Nothing is sent anywhere else.",
+        "NSLocalNetworkUsageDescription": "AEGIS connects directly to the field pod over local Wi-Fi to collect advisories. Nothing is sent anywhere else.",
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
         }

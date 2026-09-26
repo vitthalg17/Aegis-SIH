@@ -17,7 +17,9 @@ import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { color, radius, shadow, space, type } from './theme.ts';
-import type { SourceKind } from '../schema/advisory.ts';
+import type { SourceKind, VerificationStatus } from '../schema/advisory.ts';
+import { presentVerification } from '../schema/templates.ts';
+import type { Language } from '../schema/templates.ts';
 
 // ---- Tones ----------------------------------------------------------------
 
@@ -266,55 +268,176 @@ export function Measurement({
  * cannot explain is exactly what §7.3 rule 1 exists to make impossible.
  */
 export function NotMeasured({ status, reason }: { status?: string; reason?: string }) {
-  const unexplained = !status;
+  const unexplained = !status && !reason;
   const t = unexplained ? TONE.bad : TONE.unknown;
+  // The code without its parenthesised engineering detail, so a 90-character
+  // reason string does not wrap across the header it is meant to label.
+  const code = (status ?? reason ?? '').split(' (')[0];
+  // The pod's own words, kept underneath ours. Its `*_reason` strings are
+  // written for whoever is holding the device — "Optical path and calib_matrix
+  // in progress" — so they belong below the farmer-facing sentence, not
+  // instead of it, and they must not be thrown away either.
+  const detail =
+    statusDetail(status) ??
+    statusDetail(reason) ??
+    (reason && reason !== status ? reason : null);
 
   return (
     <View style={[s.notMeasured, { borderColor: t.border, backgroundColor: t.bg }]}>
       <View style={s.notMeasuredHead}>
         <Text style={[type.micro, { color: t.fg }]}>NOT MEASURED</Text>
-        {status ? (
-          <Text style={[type.micro, { color: t.fg, opacity: 0.75 }]}>{status}</Text>
-        ) : null}
+        {code ? <Text style={[type.micro, { color: t.fg, opacity: 0.75 }]}>{code}</Text> : null}
       </View>
       <Text style={[type.small, { color: t.fg, marginTop: 6 }]}>
         {unexplained
           ? 'No status given. The advisory does not say why this is missing — treat this record as untrustworthy.'
-          : (reason ?? humaniseStatus(status))}
+          : humaniseStatus(status ?? reason)}
       </Text>
+      {detail ? (
+        <Text style={[type.valueSmall, { color: t.fg, opacity: 0.7, marginTop: 6 }]}>{detail}</Text>
+      ) : null}
     </View>
   );
 }
 
-/** Fallback prose for a status code that arrived without a written reason. */
-function humaniseStatus(status?: string): string {
-  switch (status) {
-    case 'BASELINE_INITIALIZING':
-      return 'The non-water-stressed baseline is still being collected.';
+/**
+ * Fallback prose for a status code that arrived without a written reason.
+ *
+ * The pod normally sends its own sentence, and that is preferred — this is the
+ * safety net for a code it did not narrate. Every branch is written for a
+ * farmer rather than for a developer: a screen that prints NOT_SOLAR_NOON at
+ * someone standing in a field has told them nothing.
+ */
+export function humaniseStatus(status?: string): string {
+  // Several reasons arrive as a code with a parenthesised engineering detail
+  // appended — "HARDWARE_NOT_CONNECTED (Target CSI camera /dev/video1 not
+  // found...)". Match on the code and keep the detail for the developer view.
+  const code = (status ?? '').split(' (')[0];
+
+  switch (code) {
+    // -- Thermal / CWSI ------------------------------------------------------
+    case 'THERMAL_REFS_NOT_CONFIGURED':
+      return 'The thermal camera is working, but the wet and dry reference pads it measures against have not been set up. Canopy temperature is real; the stress index needs those pads and was not estimated without them.';
+    case 'INSUFFICIENT_REFERENCE_GAP':
+      return 'The wet and dry reference pads were too close in temperature for the stress index to mean anything.';
+    case 'WET_REF_VARIANCE_HIGH':
+    case 'DRY_REF_VARIANCE_HIGH':
+      return 'One of the reference pads gave an unsteady reading, so the stress index was not worked out from it.';
+    case 'HARDWARE_NOT_CONNECTED':
+      return 'The sensor this needs was not connected during the scan.';
+
+    // -- NDVI ----------------------------------------------------------------
+    case 'GATED_HARDWARE_CALIBRATION':
     case 'PENDING_HARDWARE_FINALIZATION':
-      return 'The sensor for this measurement is not finished yet.';
-    case 'INPUT_MISSING':
-      return 'The input this is computed from did not arrive.';
-    case 'EXCLUDED_RTC_INVALID':
-      return 'The source node lost its clock, so these readings were excluded.';
-    case 'BALANCE_NOT_SEEDED':
-      return 'The running water balance has not been started.';
-    case 'INSUFFICIENT_WINDOW':
-      return 'The monitoring window is too short to state a rate.';
+      return 'The second camera and its bench calibration have not landed yet. Nothing is estimated in their place.';
+    case 'NOIR_CAMERA_NOT_DETECTED_ON_CSI_1':
+      return 'The infrared camera was not found on the pod.';
+
+    // -- Satellite -----------------------------------------------------------
+    case 'NO_SATELLITE_DATA_RECORDED':
+      return 'No satellite image has been downloaded for this field yet. That step needs an internet connection, which the pod does not have in the field.';
+    case 'NO_CLEAR_SCENE':
+      return 'Every recent satellite pass over this field was under cloud.';
+    case 'CREDENTIALS_MISSING':
+      return 'The satellite service login is not set up on the pod.';
+    case 'FIELD_CONFIG_MISSING':
+    case 'FIELD_NOT_CONFIGURED':
+      return 'The boundary of this field has not been entered, so there is no area to read a satellite image over.';
+
+    // -- Irrigation ----------------------------------------------------------
+    case 'INSUFFICIENT_TEMPERATURE_HISTORY':
+      return 'Not enough temperature readings came back from the field station in the last day to work out water use.';
+
+    // -- Vegetation ----------------------------------------------------------
+    case 'INSUFFICIENT_CANOPY_FRACTION':
+      return 'Too little of the frame was canopy. Below that point soil colour dominates and the reading would be about the ground, not the crop.';
+    case 'OUT_OF_DOMAIN_FRACTION_EXCEEDED':
+      return 'Too much of the frame fell outside the range of greens this measure is defined for, so the average would have described a minority of the pixels.';
+    case 'NO_FRAMES_ACCEPTED':
+      return 'No frame in this scan passed the checks needed to compute it.';
+
+    // -- Growth stage --------------------------------------------------------
+    case 'DAYS_SINCE_PLANTING_REQUIRED':
+    case 'AWAITING_PLANTING_DATE':
+      return 'The planting date has not been entered, so the crop stage cannot be worked out.';
+    case 'CROP_NOT_SPECIFIED':
+      return 'The scan did not settle on one crop, so there is no crop calendar to place it against.';
+    case 'UNSUPPORTED_CROP':
+      return 'There is no growth-stage table for this crop in the system.';
+
+    // -- Scan ----------------------------------------------------------------
+    case 'GPS_TRACK_NOT_RECORDED':
+      return 'No satellite track was recorded during the walk, so the distance covered is not known.';
+
     default:
       return status ?? 'Not available.';
   }
 }
 
+/**
+ * The engineering detail some reason codes carry in parentheses.
+ *
+ * Shown small and last. It is genuinely useful — "`/dev/video1` not found;
+ * available: `['/dev/video0']`" is the fix — but it is for whoever is holding
+ * the pod, not for the farmer, so it must not be the sentence they read first.
+ */
+export function statusDetail(status?: string): string | null {
+  const m = /^[A-Z0-9_]+ \((.*)\)$/s.exec(status ?? '');
+  return m ? m[1] : null;
+}
+
 // ---- Source tag -----------------------------------------------------------
 
 /**
- * §7.3 rule 4 made visible. A derived quantity must not be able to pass itself
- * off as an observation, so the distinction sits on the face of every value.
+ * Rule 4 made visible. A derived quantity must not be able to pass itself off
+ * as an observation, so the distinction sits on the face of every value.
+ *
+ * `derived_fao56` is spelled out rather than shortened: a farmer reading
+ * "DERIVED FAO56" beside a water figure learns it came from a standard table
+ * and a formula, which is exactly the claim the block is making.
  */
 export function SourceTag({ source }: { source: SourceKind }) {
-  const tone: Tone = source === 'measured' ? 'good' : source === 'derived' ? 'neutral' : 'warn';
-  return <StatusChip label={source.toUpperCase()} tone={tone} />;
+  const tone: Tone =
+    source === 'measured' ? 'good' : source === 'provisional' ? 'warn' : 'neutral';
+  return <StatusChip label={String(source).replace(/_/g, ' ').toUpperCase()} tone={tone} />;
+}
+
+// ---- Verification ---------------------------------------------------------
+
+/**
+ * The citation-provenance badge that TEMPLATE_ID_REGISTRY §1.2 makes mandatory.
+ *
+ * Renders from the structural `verification_status` enum by way of
+ * `presentVerification`, never by pattern-matching the prose — which is the
+ * whole reason the edge carries the status twice. A `RECALLED_UNVERIFIED` dose
+ * gets the destructive tone and a full-width note, not a quiet grey chip, and
+ * the note cannot be collapsed: `mandatory` is decided in the schema layer and
+ * this component has no prop to override it.
+ */
+export function VerificationBadge({
+  status,
+  language = 'en',
+  /** Set false on a dense list where the full note would repeat every row. */
+  showNote = true,
+}: {
+  status: VerificationStatus;
+  language?: Language;
+  showNote?: boolean;
+}) {
+  const p = presentVerification(status, language);
+  const tone = p.tone as Tone;
+  return (
+    <View style={{ marginTop: space.sm }}>
+      <StatusChip label={p.badge} tone={tone} />
+      {showNote || p.mandatory ? (
+        <View style={{ marginTop: -space.sm }}>
+          <Panel label={p.mandatory ? 'Read this first' : 'Where this comes from'} tone={tone}>
+            {p.note}
+          </Panel>
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
 // ---- Rows and text --------------------------------------------------------

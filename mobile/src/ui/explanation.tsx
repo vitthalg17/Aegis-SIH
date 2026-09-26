@@ -102,9 +102,11 @@ export function ExplanationCard({ advisory }: { advisory: Advisory }) {
             { color: color.mutedForeground, marginBottom: space.md },
           ]}
         >
-          Written by a language model from the advisory above. Every figure in it is
-          checked against that advisory before it is shown. The advice itself comes
-          from the readings, not from the model.
+          Written by a language model from the advisory above, over the internet —
+          there is no model on this phone. Every figure in it is checked against that
+          advisory before it is shown, and the whole explanation is thrown away if one
+          does not match. The advice itself comes from the readings, not from the
+          model.
         </Text>
 
         <LanguagePicker value={language} onChange={setLanguage} />

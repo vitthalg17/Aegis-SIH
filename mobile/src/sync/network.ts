@@ -1,18 +1,18 @@
 /**
- * The §14.1 platform boundary. Everything platform-specific about reaching a
- * WiFi network that has no internet lives in this one file, so that when the
- * native module lands, nothing else in the app changes.
+ * The platform boundary. Everything platform-specific about reaching a WiFi
+ * network that has no internet lives in this one file, so that when the native
+ * module lands, nothing else in the app changes.
  *
  * ── The Android problem, stated precisely ────────────────────────────────────
  * When the phone joins SIH-FIELD (or SIH-NODE-01), Android sees a network with
  * no internet and keeps the *default* route on mobile data. A plain
  * fetch('http://192.168.4.1:8080/...') therefore leaves over the cellular
- * interface and times out. The Jetson is up, the AP is up, the phone is
+ * interface and times out. The pod is up, the AP is up, the phone is
  * associated, and the request still fails.
  *
- * The symptom is indistinguishable from a dead server, which is why §14.1 says
- * this costs a day if you hit it cold. It is why `explainNetworkFailure` below
- * exists: a timeout against a link-local address gets named, not guessed at.
+ * The symptom is indistinguishable from a dead server, which is why this costs
+ * a day if it is hit cold. It is why `explainNetworkFailure` below exists: a
+ * timeout against a link-local address gets named, not guessed at.
  *
  * ── The fix, and what it needs ───────────────────────────────────────────────
  * ConnectivityManager.requestNetwork() with a NetworkRequest specifying
@@ -74,10 +74,10 @@ export async function releaseLocalWifi(): Promise<void> {
 const LINK_LOCAL = /^https?:\/\/(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.|localhost|127\.)/i;
 
 /**
- * Turns a network error into the most likely cause, in the words of §14.1.
+ * Turns a network error into the most likely cause.
  *
  * Guessing is fine here as long as the guess is labelled as one — the point is
- * to stop a developer or a farmer concluding "the drone is broken" when the
+ * to stop a developer or a farmer concluding "the pod is broken" when the
  * actual answer is a routing default or a permissions prompt.
  */
 export function explainNetworkFailure(err: unknown, url: string): string {
@@ -87,7 +87,7 @@ export function explainNetworkFailure(err: unknown, url: string): string {
 
   if (isLocal && timedOut && Platform.OS === 'android') {
     return (
-      'Timed out reaching the field station. On Android this usually means the ' +
+      'Timed out reaching the pod. On Android this usually means the ' +
       'request went out over mobile data instead of the WiFi you joined — the ' +
       'network has no internet, so Android keeps the default route on cellular. ' +
       'Turning mobile data off is a workaround; the fix is the network binding ' +
@@ -96,7 +96,7 @@ export function explainNetworkFailure(err: unknown, url: string): string {
   }
   if (isLocal && Platform.OS === 'ios') {
     return (
-      'Could not reach the field station. If iOS has not prompted for local ' +
+      'Could not reach the pod. If iOS has not prompted for local ' +
       'network access, or it was denied, allow it in Settings > Privacy > ' +
       'Local Network. A denied prompt looks exactly like an unreachable server. ' +
       `(${message})`
@@ -104,8 +104,8 @@ export function explainNetworkFailure(err: unknown, url: string): string {
   }
   if (isLocal) {
     return (
-      'Could not reach the field station. Check the phone is joined to the ' +
-      `SIH-FIELD network and the drone is powered. (${message})`
+      'Could not reach the pod. Check the phone is joined to the SIH-FIELD ' +
+      `network and the pod is switched on. (${message})`
     );
   }
   return message;

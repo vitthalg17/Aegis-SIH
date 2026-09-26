@@ -14,6 +14,7 @@ import {
   SourceCodePro_600SemiBold,
 } from '@expo-google-fonts/source-code-pro';
 
+import { revalidateAll } from '../src/db/advisories.ts';
 import { getDb } from '../src/db/client.ts';
 import { seedFixturesIfEmpty } from '../src/db/seed.ts';
 import { color, type } from '../src/ui/theme.ts';
@@ -31,11 +32,16 @@ export default function RootLayout() {
 
   useEffect(() => {
     // §14.2 step 1 — the store comes up before anything else. The app is fully
-    // usable from here on with no drone, no Jetson and no network.
+    // usable from here on with no pod, no field station and no network.
     (async () => {
       try {
         await getDb();
+        // Order matters. Replace stale sample data first, then re-check what is
+        // left against the current validator — a record that was valid when it
+        // was stored can fail the contract as it stands today, and its stored
+        // verdict has to say so before any screen reads it.
         await seedFixturesIfEmpty();
+        await revalidateAll();
         setDbReady(true);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
