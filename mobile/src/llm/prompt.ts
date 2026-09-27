@@ -82,6 +82,9 @@ WHAT THE FIELDS MEAN
   fault: the sensor works and what it measures directly is real, but a figure
   derived from it needs a calibration step that has not been done, so that
   figure was withheld. ABSENT means the sensor was not connected. Say which.
+  Exception: if "thermal.reason" is REPLAY_THERMAL_NOT_OF_SCENE, pod_thermal is
+  ABSENT because this is a replay and the thermal camera was not looking at the
+  video's scene. The camera is connected; its reading was left out on purpose.
 - "source" is how a number came to exist: measured, derived, or provisional.
   Do not describe a derived or provisional number as an observation.
 - Every action is advisory only. This system does not operate any equipment and

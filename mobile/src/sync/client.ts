@@ -34,9 +34,9 @@
  * has been run over the radio it will ship on.
  */
 
-import { highestSeq, ingestAdvisory, knownAdvisoryIds } from '../db/advisories.ts';
+import { ingestAdvisory, knownAdvisoryIds } from '../db/advisories.ts';
 import { getState, setState } from '../db/client.ts';
-import { REWIND_TO, podHasRestarted } from './cursor.ts';
+import { REWIND_TO, advanceCursor, podHasRestarted } from './cursor.ts';
 import { bindToLocalWifi, explainNetworkFailure } from './network.ts';
 
 /** The pod's SoftAP. The ground mast lives on 192.168.9.1, off this subnet. */
@@ -467,6 +467,9 @@ export async function fetchAdvisory(idOrSeq: string | number, baseUrl?: string):
  *
  * The quick path for "I just finished a scan, show me". A full `syncNow`
  * afterwards is still cheap and still idempotent.
+ *
+ * It does not touch the cursor. It skipped every record before the latest
+ * one, so moving the cursor to it would stop the next full pull offering them.
  */
 export async function pullLatest(): Promise<{ advisoryId: string; valid: boolean }> {
   const base = await getBaseUrl();
@@ -498,17 +501,22 @@ export function clockSkewSeconds(health: Health, now: Date = new Date()): number
   return Math.round((now.getTime() - t) / 1000);
 }
 
-/** The cursor, recovered from the replica when sync_state has lost it. */
+/**
+ * The stored cursor, or null to pull from the beginning.
+ *
+ * No cursor means a full pull, never the highest seq the replica holds. The
+ * replica can hold a high seq without the ones below it: "Just get the newest
+ * scan" and a file import both store one record out of order. Starting after
+ * it would skip the rest for good. Starting from the beginning costs one
+ * longer manifest, and records already held are filtered out before fetching.
+ */
 async function readCursor(): Promise<number | null> {
   const raw = await getState('cursor');
-  if (raw !== null) {
-    const n = Number(raw);
-    // A cursor written by an older build is an advisory_id string. It cannot be
-    // compared or incremented, so fall back to the replica's own high-water
-    // mark rather than sending it and hoping the pod resolves it.
-    if (Number.isFinite(n)) return n;
-  }
-  return highestSeq();
+  if (raw === null) return null;
+  // A cursor written by an older build is an advisory_id string. It cannot be
+  // compared, so start over rather than sending it and hoping the pod resolves it.
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
 }
 
 // ---- The delta pull -------------------------------------------------------
@@ -529,9 +537,16 @@ export async function syncNow(onProgress?: (p: SyncProgress) => void): Promise<S
   let gone = 0;
   let refusedMock = 0;
   let podReset = false;
-  let lastLanded: number | null = startCursor;
+
+  // Everything the manifest listed, and the ids from it that are settled: held
+  // in the replica, or final (404, 410, refused as mock). The cursor is derived
+  // from these two rather than tracked by hand. See `advanceCursor`.
+  const entries: ManifestEntry[] = [];
+  const settled = new Set<string>();
+  const landed = () => advanceCursor(startCursor, entries, settled);
 
   const fail = async (error: string): Promise<SyncOutcome> => {
+    const lastLanded = landed();
     await setState('last_sync_error', error);
     if (lastLanded !== null) await setState('cursor', String(lastLanded));
     return {
@@ -585,7 +600,6 @@ export async function syncNow(onProgress?: (p: SyncProgress) => void): Promise<S
   if (podHasRestarted(health, startCursor)) {
     podReset = true;
     startCursor = REWIND_TO;
-    lastLanded = REWIND_TO;
     await setState('cursor', String(REWIND_TO));
   }
 
@@ -595,7 +609,6 @@ export async function syncNow(onProgress?: (p: SyncProgress) => void): Promise<S
   // anyway because the pod implements it, and one sync algorithm that works at
   // both hops is worth more than ten saved lines.
 
-  const entries: ManifestEntry[] = [];
   let cursor = startCursor;
 
   for (let page = 0; page < MAX_PAGES; page++) {
@@ -634,10 +647,7 @@ export async function syncNow(onProgress?: (p: SyncProgress) => void): Promise<S
   const wanted = entries.filter((e) => {
     if (known.has(e.advisory_id)) {
       skipped++;
-      // Already held, so the cursor may still advance past it.
-      if (typeof e.seq === 'number' && (lastLanded === null || e.seq > lastLanded)) {
-        lastLanded = e.seq;
-      }
+      settled.add(e.advisory_id);
       return false;
     }
     return true;
@@ -660,13 +670,13 @@ export async function syncNow(onProgress?: (p: SyncProgress) => void): Promise<S
       fetched++;
       if (!result.valid) invalid++;
       // Resumability: the cursor follows what committed, not what was listed.
-      if (typeof entry.seq === 'number') lastLanded = entry.seq;
+      settled.add(entry.advisory_id);
     } catch (err) {
       // A 404 or 410 is final — the record will not appear later, so stopping
       // here would wedge the sync on it forever. Step over it and keep going.
       if (err instanceof HttpError && (err.status === 404 || err.status === 410)) {
         gone++;
-        if (typeof entry.seq === 'number') lastLanded = entry.seq;
+        settled.add(entry.advisory_id);
         continue;
       }
       // The production guard refusing a mock advisory is also final, and it is
@@ -675,7 +685,7 @@ export async function syncNow(onProgress?: (p: SyncProgress) => void): Promise<S
       // refused as simulated" rather than "three are missing".
       if (err instanceof HttpError && err.isMockRejection) {
         refusedMock++;
-        if (typeof entry.seq === 'number') lastLanded = entry.seq;
+        settled.add(entry.advisory_id);
         continue;
       }
       // Anything else is a gap we might recover from. Stop rather than skip
@@ -690,6 +700,7 @@ export async function syncNow(onProgress?: (p: SyncProgress) => void): Promise<S
   // acked and never deletes an advisory on ack; this only advances the count it
   // reports on /health so the connection screen can say how many are waiting.
 
+  const lastLanded = landed();
   if (lastLanded !== null && lastLanded !== startCursor) {
     onProgress?.({ phase: 'acking', fetched, total: wanted.length });
     try {

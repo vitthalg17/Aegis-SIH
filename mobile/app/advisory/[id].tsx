@@ -161,7 +161,7 @@ export default function AdvisoryScreen() {
       <ExplanationCard advisory={a} />
 
       {/* States of the sensors, above the numbers they qualify. */}
-      <InputsCard inputs={a.inputs} />
+      <InputsCard inputs={a.inputs} thermalReason={a.thermal?.reason} />
 
       {/* Findings, with their reliability tier ahead of their confidence. */}
       <DiseaseCard advisory={a} />

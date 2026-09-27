@@ -443,13 +443,41 @@ const INPUT_STATUS_BODY: Record<string, string> = {
 };
 
 /**
+ * `pod_thermal: ABSENT` on a replay, where it does not mean "not connected".
+ *
+ * When `thermal.reason` is REPLAY_THERMAL_NOT_OF_SCENE, the pod reports the
+ * thermal input as ABSENT because its reading was dropped: the camera was not
+ * looking at the scene in the video being replayed. Showing NOT CONNECTED
+ * would send someone to check a cable that is fine.
+ */
+const REPLAY_THERMAL_LABEL = 'NOT USED – REPLAY';
+const REPLAY_THERMAL_BODY =
+  'This scan is a replay of a recorded video. The thermal camera was connected, but it was not looking at the scene in the video, so its reading was left out rather than attached to the wrong field.';
+
+function isReplayThermal(input: AdvisoryInput, thermalReason?: string | null): boolean {
+  return (
+    input.name === 'pod_thermal' &&
+    input.status === 'ABSENT' &&
+    (thermalReason ?? '').split(' (')[0] === 'REPLAY_THERMAL_NOT_OF_SCENE'
+  );
+}
+
+/**
  * What the advisory was built from.
  *
  * Contract v1.0 trimmed this block to name, node and status — there are no
  * per-input ages or RTC flags on the wire any more. The status enum carries
  * the whole story now, and the four values are genuinely different claims.
+ * The one exception is thermal on a replay, which needs `thermal.reason` to
+ * tell apart from a missing camera — see `isReplayThermal`.
  */
-export function InputsCard({ inputs }: { inputs: AdvisoryInput[] }) {
+export function InputsCard({
+  inputs,
+  thermalReason,
+}: {
+  inputs: AdvisoryInput[];
+  thermalReason?: string | null;
+}) {
   if (!inputs || inputs.length === 0) {
     return (
       <Card eyebrow="Provenance" title="What this was built from">
@@ -465,7 +493,12 @@ export function InputsCard({ inputs }: { inputs: AdvisoryInput[] }) {
     <Card eyebrow="Provenance" title="What this was built from">
       {inputs.map((input, i) => {
         const status = input.status as InputStatus;
-        const body = INPUT_STATUS_BODY[status];
+        const replayThermal = isReplayThermal(input, thermalReason);
+        const label = replayThermal
+          ? REPLAY_THERMAL_LABEL
+          : (INPUT_STATUS_LABEL[status] ?? String(status).replace(/_/g, ' '));
+        const tone: Tone = replayThermal ? 'neutral' : (INPUT_STATUS_TONE[status] ?? 'bad');
+        const body = replayThermal ? REPLAY_THERMAL_BODY : INPUT_STATUS_BODY[status];
         return (
           <View key={`${input.name}-${i}`}>
             {i > 0 ? <Divider /> : null}
@@ -478,16 +511,10 @@ export function InputsCard({ inputs }: { inputs: AdvisoryInput[] }) {
                   {input.source_node === 'POD' ? 'on the pod you carry' : 'on the field station'}
                 </Text>
               </View>
-              <StatusChip
-                label={INPUT_STATUS_LABEL[status] ?? String(status).replace(/_/g, ' ')}
-                tone={INPUT_STATUS_TONE[status] ?? 'bad'}
-              />
+              <StatusChip label={label} tone={tone} />
             </Row>
             {body ? (
-              <Panel
-                label={INPUT_STATUS_LABEL[status] ?? 'Note'}
-                tone={INPUT_STATUS_TONE[status] ?? 'bad'}
-              >
+              <Panel label={label} tone={tone}>
                 {body}
               </Panel>
             ) : null}

@@ -17,7 +17,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { REWIND_TO, podHasRestarted } from './cursor.ts';
+import { REWIND_TO, advanceCursor, podHasRestarted } from './cursor.ts';
 
 // ---- It must fire ---------------------------------------------------------
 
@@ -80,10 +80,8 @@ test('a non-numeric latest_seq is ignored rather than coerced', () => {
 // ---- Where it rewinds to --------------------------------------------------
 
 test('rewinding lands on zero, not on null', () => {
-  // Not cosmetic. `null` sends readCursor() to the replica's own high-water
-  // mark as a fallback — which after a reset is the *old* numbering, so the
-  // next sync detects a restart again and loops. An explicit 0 is a real
-  // cursor meaning "from the beginning".
+  // Both pull from the beginning, but a stored 0 also records that this phone
+  // has synced before, which keeps a cleared replica from being re-seeded.
   assert.equal(REWIND_TO, 0);
 });
 
@@ -92,4 +90,41 @@ test('the rewind target immediately stops the check firing again', () => {
   // that is still empty. Otherwise every sync rewinds and re-pulls for ever.
   assert.equal(podHasRestarted({ latest_seq: 0 }, REWIND_TO), false);
   assert.equal(podHasRestarted({ latest_seq: 3 }, REWIND_TO), false);
+});
+
+// ---- How far the cursor advances ------------------------------------------
+
+const seqs = (...ns: number[]) => ns.map((n) => ({ advisory_id: `A${n}`, seq: n }));
+const held = (...ns: number[]) => new Set(ns.map((n) => `A${n}`));
+
+test('newest scan pulled alone: the next full pull does not start after it', () => {
+  // The bug from the Nano log. "Just get the newest scan" stored seq 7 and the
+  // following pull asked for since=7, so 1-6 never came across. With 1-6
+  // listed and not yet held, the cursor must not move at all.
+  assert.equal(advanceCursor(null, seqs(1, 2, 3, 4, 5, 6, 7), held(7)), null);
+});
+
+test('once the gap is filled, it advances past the record already held', () => {
+  assert.equal(advanceCursor(null, seqs(1, 2, 3, 4, 5, 6, 7), held(1, 2, 3, 4, 5, 6, 7)), 7);
+});
+
+test('a failed fetch stops the cursor below it, even when later records are held', () => {
+  // Fetching seq 3 failed. Seq 7 is held, but saving 7 would drop 3-6 for good.
+  assert.equal(advanceCursor(0, seqs(1, 2, 3, 4, 5, 6, 7), held(1, 2, 7)), 2);
+});
+
+test('failing on the very first record leaves the cursor where it started', () => {
+  assert.equal(advanceCursor(null, seqs(1, 2, 7), held(7)), null);
+  assert.equal(advanceCursor(4, seqs(5, 6, 7), held(7)), 4);
+});
+
+test('gaps in the pod numbering do not block the cursor', () => {
+  // seq is never reused, so pruned or rolled-back rows leave gaps. Only listed
+  // records count; a missing number is not a missing record.
+  assert.equal(advanceCursor(0, seqs(2, 5, 9), held(2, 5, 9)), 9);
+});
+
+test('never moves backwards, and ignores listing order', () => {
+  assert.equal(advanceCursor(10, [], held()), 10);
+  assert.equal(advanceCursor(null, seqs(3, 1, 2), held(1, 2, 3)), 3);
 });

@@ -73,15 +73,19 @@ type Row = {
 };
 
 /**
- * Ordering, in one place.
+ * Ordering, in one place: newest first by the date on the card.
  *
- * `seq` is the pod's commit order and is the only thing that orders these
- * safely — the pod has no battery-backed clock, so generated_at_utc can jump
- * backwards across a reboot through no fault of anyone's. Records without a seq
- * (an imported file, an older pod) fall back to the timestamp and sort after
- * everything that has one.
+ * Not by `seq`. It is the pod's commit order, so it only orders records that
+ * came from one pod's database. The sample fixtures carry seqs in the 90s, a
+ * freshly flashed pod starts again at 1, and ordering by seq put a synced
+ * 25 Sep advisory below 20 Sep samples. The list has to match the dates it
+ * prints. `seq` breaks ties between records stamped in the same second.
+ *
+ * The cost: before a GPS fix the pod's clock can be wrong, and a record it
+ * stamps then sorts by that wrong date. The card shows the same date, so the
+ * order at least agrees with what the farmer reads.
  */
-const ORDER = 'ORDER BY seq IS NULL, seq DESC, generated_at_utc DESC';
+const ORDER = 'ORDER BY generated_at_utc DESC, seq DESC';
 
 const COLUMNS =
   'advisory_id, seq, field_id, generated_at_utc, schema_version, json, ' +
@@ -260,21 +264,6 @@ export async function knownAdvisoryIds(): Promise<Set<string>> {
   const db = await getDb();
   const rows = await db.getAllAsync<{ advisory_id: string }>('SELECT advisory_id FROM advisories');
   return new Set(rows.map((r) => r.advisory_id));
-}
-
-/**
- * The highest pod sequence number this replica holds.
- *
- * Used to recover the cursor when it is missing or behind — after a reinstall,
- * or after an import — so the next pull asks for the right window instead of
- * refetching everything or, worse, skipping a gap.
- */
-export async function highestSeq(): Promise<number | null> {
-  const db = await getDb();
-  const row = await db.getFirstAsync<{ n: number | null }>(
-    "SELECT MAX(seq) AS n FROM advisories WHERE origin != 'fixture'",
-  );
-  return row?.n ?? null;
 }
 
 /**

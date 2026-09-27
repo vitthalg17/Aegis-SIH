@@ -325,6 +325,8 @@ export function humaniseStatus(status?: string): string {
       return 'One of the reference pads gave an unsteady reading, so the stress index was not worked out from it.';
     case 'HARDWARE_NOT_CONNECTED':
       return 'The sensor this needs was not connected during the scan.';
+    case 'REPLAY_THERMAL_NOT_OF_SCENE':
+      return 'This scan is a replay of a recorded video. The thermal camera was not pointed at the scene in the video, so its reading would describe somewhere else and was left out. The camera itself is fine.';
 
     // -- NDVI ----------------------------------------------------------------
     case 'GATED_HARDWARE_CALIBRATION':

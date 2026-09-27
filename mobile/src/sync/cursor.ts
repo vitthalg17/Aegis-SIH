@@ -65,10 +65,50 @@ export function podHasRestarted(
 /**
  * Where to rewind to.
  *
- * Zero rather than null, and the difference matters. `null` means "no cursor",
- * which sends `readCursor()` to the replica's own high-water mark as a
- * fallback — and after a reset that mark is the *old* numbering, so the next
- * sync would detect a restart all over again and loop. An explicit 0 is a real
- * cursor meaning "from the beginning", so the condition settles immediately.
+ * Zero rather than null. Both mean "from the beginning" to the manifest, but a
+ * stored 0 also records that this phone has synced before, which the fixture
+ * seeding reads (`seed.ts`) to keep a deliberately cleared replica cleared.
  */
 export const REWIND_TO = 0;
+
+/** Just the part of a manifest entry the cursor decision reads. */
+export type CursorEntry = {
+  advisory_id: string;
+  seq: number;
+};
+
+/**
+ * How far the cursor may move after a pull.
+ *
+ * ── The rule ────────────────────────────────────────────────────────────────
+ * The cursor means "the phone holds everything up to here". The next manifest
+ * starts strictly after it, so anything below the cursor that the phone does
+ * not hold is never offered again. The cursor may therefore only advance
+ * through an unbroken run of settled records, and stops at the first one that
+ * is not.
+ *
+ * "Settled" means the phone holds it, or it can never be fetched (a 404, 410
+ * or mock refusal).
+ *
+ * ── The failure this prevents ───────────────────────────────────────────────
+ * "Just get the newest scan" stores seq 7 without walking the manifest. The
+ * old rule jumped to the highest seq the phone held, so the next full pull
+ * asked for `since=7` and seqs 1–6 were never pulled. The same rule let one
+ * failed fetch of seq 1 save a cursor of 7, because 7 was already held. Both
+ * cases skip records permanently and still report the sync as a success.
+ */
+export function advanceCursor(
+  start: number | null,
+  listed: readonly CursorEntry[],
+  settled: ReadonlySet<string>,
+): number | null {
+  let cursor = start;
+  const ordered = listed
+    .filter((e) => typeof e.seq === 'number')
+    .sort((a, b) => a.seq - b.seq);
+  for (const entry of ordered) {
+    if (!settled.has(entry.advisory_id)) break;
+    if (cursor === null || entry.seq > cursor) cursor = entry.seq;
+  }
+  return cursor;
+}
