@@ -13,10 +13,11 @@
  * has no prop that renders a null as 0, blank, or a dash.
  */
 
+import { Children, createContext, useContext, useState } from 'react';
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { color, radius, shadow, space, type } from './theme.ts';
+import { color, font, radius, shadow, space, type } from './theme.ts';
 import type { SourceKind, VerificationStatus } from '../schema/advisory.ts';
 import { presentVerification } from '../schema/templates.ts';
 import type { Language } from '../schema/templates.ts';
@@ -92,17 +93,76 @@ export function StatusChip({ label, tone = 'neutral' }: { label: string; tone?: 
 
 // ---- Card -----------------------------------------------------------------
 
+/**
+ * True inside a `<Group>`. A `Card` rendered there becomes one foldable row of
+ * the group instead of a card of its own, so the detailed cards can be stacked
+ * into one compact list without each being rewritten.
+ */
+const InGroup = createContext(false);
+
+/** True inside a `<TileGrid>`: a `Card` with a `tile` renders as a tile. */
+const InTiles = createContext(false);
+
+/** What a reading shows as a weather-style tile. */
+export type TileSpec = {
+  icon: ReactNode;
+  /** Short caps label above the number: "LEAF TEMP". */
+  label: string;
+  /** The one big figure, or a short phrase when nothing was measured. */
+  value: string;
+  unit?: string;
+  tone?: Tone;
+  /** True when `value` is a phrase like "Not measured" rather than a reading. */
+  muted?: boolean;
+  /** The small graphic that places the value on its scale. */
+  visual?: ReactNode;
+  caption?: string;
+};
+
 export function Card({
   title,
   eyebrow,
   right,
+  summary,
+  summaryTone = 'neutral',
+  note,
+  tile,
   children,
 }: {
   title?: string;
   eyebrow?: string;
   right?: ReactNode;
+  /**
+   * The one-line reading shown while folded inside a `<Group>`. Ignored on a
+   * standalone card, which always shows its full body.
+   */
+  summary?: string;
+  summaryTone?: Tone;
+  /**
+   * A caveat that must stay visible while folded, because the summary would
+   * mislead without it. Rendered under the summary, never behind the tap.
+   */
+  note?: string;
+  /** How this card looks inside a `<TileGrid>`. Ignored everywhere else. */
+  tile?: TileSpec;
   children: ReactNode;
 }) {
+  const inTiles = useContext(InTiles);
+  const inGroup = useContext(InGroup);
+  if (inTiles && tile) {
+    return (
+      <Tile spec={tile} title={title ?? eyebrow ?? ''}>
+        {children}
+      </Tile>
+    );
+  }
+  if (inGroup) {
+    return (
+      <Fold title={title ?? eyebrow ?? ''} summary={summary} summaryTone={summaryTone} note={note}>
+        {children}
+      </Fold>
+    );
+  }
   return (
     <View style={s.card}>
       {(title || eyebrow || right) && (
@@ -121,6 +181,190 @@ export function Card({
         </View>
       )}
       {children}
+    </View>
+  );
+}
+
+/**
+ * One card holding several foldable rows.
+ *
+ * Every child `Card` renders as a row: its title, a one-line summary and a
+ * chevron. Tapping opens the full card body in place. This is what keeps the
+ * advisory screen to about two phone-heights without dropping any of what the
+ * individual cards say — it is all still there, one tap down.
+ */
+export function Group({
+  eyebrow,
+  title,
+  children,
+}: {
+  eyebrow?: string;
+  title?: string;
+  children: ReactNode;
+}) {
+  const rows = Children.toArray(children).filter(Boolean);
+  return (
+    <View style={s.card}>
+      {eyebrow || title ? (
+        <View style={{ marginBottom: space.xs }}>
+          {eyebrow ? (
+            <Text style={[type.micro, { color: color.fgSubtle, marginBottom: 5 }]}>
+              {eyebrow.toUpperCase()}
+            </Text>
+          ) : null}
+          {title ? <Text style={[type.cardTitle, { color: color.foreground }]}>{title}</Text> : null}
+        </View>
+      ) : null}
+      <InGroup.Provider value>
+        {rows.map((row, i) => (
+          <View key={i} style={i > 0 ? s.groupRule : undefined}>
+            {row}
+          </View>
+        ))}
+      </InGroup.Provider>
+    </View>
+  );
+}
+
+/**
+ * The field readings as a grid of tiles, weather-app style.
+ *
+ * Two tiles to a row, each an icon, one big figure and a small graphic. A tap
+ * widens that tile to the full row and opens the full card beneath its figure,
+ * so the detail sits where the eye already is.
+ */
+export function TileGrid({
+  eyebrow,
+  title,
+  children,
+}: {
+  eyebrow?: string;
+  title?: string;
+  children: ReactNode;
+}) {
+  return (
+    <View style={{ marginBottom: space.md }}>
+      {eyebrow || title ? (
+        <View style={{ marginBottom: space.sm, paddingHorizontal: 2 }}>
+          {eyebrow ? (
+            <Text style={[type.micro, { color: color.fgSubtle, marginBottom: 4 }]}>
+              {eyebrow.toUpperCase()}
+            </Text>
+          ) : null}
+          {title ? <Text style={[type.cardTitle, { color: color.foreground }]}>{title}</Text> : null}
+        </View>
+      ) : null}
+      <InTiles.Provider value>
+        <View style={s.tileGrid}>{children}</View>
+      </InTiles.Provider>
+    </View>
+  );
+}
+
+function Tile({ spec, title, children }: { spec: TileSpec; title: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const tone = spec.muted ? 'unknown' : (spec.tone ?? 'neutral');
+  const t = TONE[tone];
+  const bg = tone === 'neutral' ? color.card : t.bg;
+  const fg = tone === 'neutral' ? color.foreground : t.fg;
+
+  return (
+    <View style={[s.tile, { backgroundColor: bg, borderColor: t.border }, open && s.tileOpen]}>
+      <Pressable
+        onPress={() => setOpen((o) => !o)}
+        accessibilityRole="button"
+        accessibilityLabel={`${title}: ${spec.value}${spec.unit ? ` ${spec.unit}` : ''}`}
+        accessibilityState={{ expanded: open }}
+        style={({ pressed }) => [pressed && { opacity: 0.7 }]}
+      >
+        <View style={s.tileHead}>
+          {spec.icon}
+          <Text style={[type.micro, { color: fg, flex: 1, opacity: 0.85 }]} numberOfLines={1}>
+            {spec.label}
+          </Text>
+          <Text style={[type.chipValue, { color: fg, opacity: 0.6 }]}>{open ? '−' : '+'}</Text>
+        </View>
+
+        <View style={s.tileValueRow}>
+          <Text
+            style={[spec.muted ? s.tileMuted : s.tileValue, { color: fg }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {spec.value}
+          </Text>
+          {spec.unit && !spec.muted ? (
+            <Text style={[type.label, { color: fg, marginLeft: 3, opacity: 0.8 }]}>{spec.unit}</Text>
+          ) : null}
+        </View>
+
+        {spec.visual && !spec.muted ? <View style={{ marginTop: 6 }}>{spec.visual}</View> : null}
+
+        {spec.caption ? (
+          <Text style={[type.small, { color: fg, marginTop: 6, opacity: 0.85 }]} numberOfLines={open ? undefined : 2}>
+            {spec.caption}
+          </Text>
+        ) : null}
+      </Pressable>
+
+      {open ? <View style={s.tileBody}>{children}</View> : null}
+    </View>
+  );
+}
+
+/** A row that shows a summary and opens to its full content on tap. */
+export function Fold({
+  title,
+  summary,
+  summaryTone = 'neutral',
+  note,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  summary?: string;
+  summaryTone?: Tone;
+  note?: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const t = TONE[summaryTone];
+  return (
+    <View>
+      <Pressable
+        onPress={() => setOpen((o) => !o)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityHint={open ? 'Hides the details' : 'Shows the details'}
+        style={({ pressed }) => [s.foldHead, pressed && { opacity: 0.6 }]}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={[type.label, { color: color.foreground }]}>{title}</Text>
+          {summary ? (
+            <View style={s.foldSummary}>
+              <View style={[s.dot, { backgroundColor: summaryTone === 'neutral' ? color.fgSubtle : t.fg }]} />
+              <Text
+                style={[
+                  type.small,
+                  { color: summaryTone === 'neutral' ? color.mutedForeground : t.fg, flex: 1 },
+                ]}
+              >
+                {summary}
+              </Text>
+            </View>
+          ) : null}
+          {note ? (
+            <Text style={[type.small, { color: color.fgSubtle, marginTop: 3, fontSize: 12 }]}>
+              {note}
+            </Text>
+          ) : null}
+        </View>
+        <Text style={[type.chipValue, { color: color.fgSubtle, fontSize: 16 }]}>
+          {open ? '−' : '+'}
+        </Text>
+      </Pressable>
+      {open ? <View style={{ paddingBottom: space.md }}>{children}</View> : null}
     </View>
   );
 }
@@ -271,13 +515,12 @@ export function Measurement({
 export function NotMeasured({ status, reason }: { status?: string; reason?: string }) {
   const unexplained = !status && !reason;
   const t = unexplained ? TONE.bad : TONE.unknown;
-  // The code without its parenthesised engineering detail, so a 90-character
-  // reason string does not wrap across the header it is meant to label.
-  const code = (status ?? reason ?? '').split(' (')[0];
   // The pod's own words, kept underneath ours. Its `*_reason` strings are
   // written for whoever is holding the device — "Optical path and calib_matrix
   // in progress" — so they belong below the farmer-facing sentence, not
-  // instead of it, and they must not be thrown away either.
+  // instead of it, and they must not be thrown away either. The bare status
+  // code is not shown: it is a string for the developer log, and on a phone
+  // screen it read as an error message.
   const detail =
     statusDetail(status) ??
     statusDetail(reason) ??
@@ -287,11 +530,10 @@ export function NotMeasured({ status, reason }: { status?: string; reason?: stri
     <View style={[s.notMeasured, { borderColor: t.border, backgroundColor: t.bg }]}>
       <View style={s.notMeasuredHead}>
         <Text style={[type.micro, { color: t.fg }]}>NOT MEASURED</Text>
-        {code ? <Text style={[type.micro, { color: t.fg, opacity: 0.75 }]}>{code}</Text> : null}
       </View>
       <Text style={[type.small, { color: t.fg, marginTop: 6 }]}>
         {unexplained
-          ? 'No status given. The advisory does not say why this is missing — treat this record as untrustworthy.'
+          ? 'No status given. The advisory does not say why this is missing. Treat this record as untrustworthy.'
           : humaniseStatus(status ?? reason)}
       </Text>
       {detail ? (
@@ -384,6 +626,68 @@ export function humaniseStatus(status?: string): string {
 
     default:
       return status ?? 'Not available.';
+  }
+}
+
+/**
+ * The same reasons as `humaniseStatus`, cut to a phrase for a folded row.
+ *
+ * The full sentence is one tap away; this is what a farmer reads while
+ * scanning the list, so it names the gap and nothing else.
+ */
+export function shortStatus(status?: string | null): string {
+  const code = (status ?? '').split(' (')[0];
+  switch (code) {
+    case 'THERMAL_REFS_NOT_CONFIGURED':
+      return 'Reference pads not set up';
+    case 'INSUFFICIENT_REFERENCE_GAP':
+    case 'WET_REF_VARIANCE_HIGH':
+    case 'DRY_REF_VARIANCE_HIGH':
+      return 'Reference pads gave a bad reading';
+    case 'HARDWARE_NOT_CONNECTED':
+      return 'Sensor not connected';
+    case 'REPLAY_THERMAL_NOT_OF_SCENE':
+      return 'Not used (replayed video)';
+    case 'GATED_HARDWARE_CALIBRATION':
+    case 'PENDING_HARDWARE_FINALIZATION':
+      return 'Infrared camera not fitted yet';
+    case 'NOIR_CAMERA_NOT_DETECTED_ON_CSI_1':
+      return 'Infrared camera not found';
+    case 'NO_SATELLITE_DATA_RECORDED':
+      return 'No satellite image downloaded';
+    case 'NO_CLEAR_SCENE':
+      return 'Cloudy on every recent satellite pass';
+    case 'CREDENTIALS_MISSING':
+      return 'Satellite login not set up';
+    case 'FIELD_CONFIG_MISSING':
+    case 'FIELD_NOT_CONFIGURED':
+      return 'Field boundary not entered';
+    case 'INSUFFICIENT_TEMPERATURE_HISTORY':
+      return 'Field station needs more readings';
+    case 'INSUFFICIENT_24H_HISTORY': {
+      const need = /need[^,]*?spanning\s*>=\s*([\d.]+)\s*h/.exec(status ?? '')?.[1];
+      const found = /found[^,]*?spanning\s*([\d.]+)\s*h/.exec(status ?? '')?.[1];
+      return need && found
+        ? `Station has ${found} h of readings, needs ${need} h`
+        : 'Field station needs more hours of readings';
+    }
+    case 'INSUFFICIENT_CANOPY_FRACTION':
+      return 'Too little crop in the frame';
+    case 'OUT_OF_DOMAIN_FRACTION_EXCEEDED':
+      return 'Colours outside the measurable range';
+    case 'NO_FRAMES_ACCEPTED':
+      return 'No usable frames';
+    case 'DAYS_SINCE_PLANTING_REQUIRED':
+    case 'AWAITING_PLANTING_DATE':
+      return 'Planting date not entered';
+    case 'CROP_NOT_SPECIFIED':
+      return 'Scan saw more than one crop';
+    case 'UNSUPPORTED_CROP':
+      return 'No stage table for this crop';
+    case 'GPS_TRACK_NOT_RECORDED':
+      return 'No GPS track recorded';
+    default:
+      return 'Not available';
   }
 }
 
@@ -524,6 +828,41 @@ const s = StyleSheet.create({
     marginBottom: space.md,
     gap: space.sm,
   },
+
+  tileGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: space.sm },
+  tile: {
+    width: '48.8%',
+    borderWidth: 1,
+    borderRadius: radius.xl,
+    padding: space.md,
+    ...shadow.card,
+  },
+  tileOpen: { width: '100%' },
+  tileHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  tileValueRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: space.sm },
+  tileValue: { fontFamily: font.sansBold, fontSize: 30, lineHeight: 34, letterSpacing: -0.8 },
+  tileMuted: { fontFamily: font.sansBold, fontSize: 17, lineHeight: 34 },
+  tileBody: {
+    marginTop: space.md,
+    paddingTop: space.md,
+    borderTopWidth: 1,
+    borderTopColor: color.border,
+    backgroundColor: color.card,
+    marginHorizontal: -space.md,
+    marginBottom: -space.md,
+    paddingHorizontal: space.md,
+    paddingBottom: space.md,
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
+  },
+  groupRule: { borderTopWidth: 1, borderTopColor: color.border },
+  foldHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    paddingVertical: space.md,
+  },
+  foldSummary: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
 
   panel: {
     borderWidth: 1,

@@ -99,7 +99,7 @@ export const DRIED_LEAF_CLASS = 'sugarcane__dried_leaf';
  * the three ordinary things dried leaves can mean and sends the farmer to look.
  */
 export const DRIED_LEAF_CAVEAT =
-  'Dried leaf detected — this is not a disease. It can follow water stress, ' +
+  'Dried leaf detected. This is not a disease. It can follow water stress, ' +
   'normal crop stage, or a nutrient shortage. Check irrigation and crop stage.';
 
 /**

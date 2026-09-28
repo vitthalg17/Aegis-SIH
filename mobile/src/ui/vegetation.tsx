@@ -32,6 +32,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Card, Divider, Measurement, Panel, StatusChip, humaniseStatus } from './components.tsx';
 import type { Tone } from './components.tsx';
 import { DistributionStrip, Meter } from './charts.tsx';
+import { LeafIcon, ProgressBar } from './tiles.tsx';
 import { color, space, type } from './theme.ts';
 import type { CanopyCover, Vegetation, VegetationIndex } from '../schema/advisory.ts';
 import { VEGETATION_CAVEAT } from '../schema/advisory.ts';
@@ -138,6 +139,54 @@ function IndexRow({
 }
 
 /**
+ * ExG, TGI and DGCI, side by side.
+ *
+ * None of the three carries a band, so each is a bare mean — useful to someone
+ * comparing scans, and noise to someone reading one. They get one compact row
+ * instead of a titled block each, and a withheld one says so in its cell
+ * rather than showing a blank.
+ */
+function OtherIndices({
+  exg,
+  tgi,
+  dgci,
+}: {
+  exg: VegetationIndex;
+  tgi: VegetationIndex;
+  dgci: VegetationIndex;
+}) {
+  const cells: [string, VegetationIndex][] = [
+    ['ExG', exg],
+    ['TGI', tgi],
+    ['DGCI', dgci],
+  ];
+  return (
+    <View>
+      <Text style={[type.chipLabel, { color: color.fgSubtle }]}>OTHER COLOUR MEASURES</Text>
+      <View style={s.cells}>
+        {cells.map(([label, index]) => (
+          <View key={label} style={{ flex: 1 }}>
+            <Text style={[type.valueSmall, { color: color.fgSubtle }]}>{label}</Text>
+            <Text style={[type.value, { color: index.mean === null ? color.unknown : color.foreground, fontSize: 16 }]}>
+              {index.mean === null ? 'withheld' : String(index.mean)}
+            </Text>
+          </View>
+        ))}
+      </View>
+      <Text style={[type.small, { color: color.mutedForeground, marginTop: space.xs }]}>
+        For comparing scans over time. ExG tracks how much leaf is in frame, TGI the
+        chlorophyll signal, DGCI how deep the green is.
+      </Text>
+      {cells.some(([, i]) => i.mean === null) ? (
+        <Text style={[type.small, { color: color.unknown, marginTop: space.xs }]}>
+          {humaniseStatus(cells.find(([, i]) => i.mean === null)?.[1].reason ?? undefined)}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+/**
  * How much of the frame was crop at all.
  *
  * This gates everything below it, so it is rendered first and with its own
@@ -173,7 +222,7 @@ function CanopyRow({ canopy }: { canopy: CanopyCover }) {
 
       {low ? (
         <Panel label="Indices withheld" tone="warn">
-          {`Canopy cover too low to measure vegetation indices (under ${Math.round(floor * 100)}%). Nothing was computed in their place — a number here would be about the soil, not the crop.`}
+          {`Canopy cover too low to measure vegetation indices (under ${Math.round(floor * 100)}%). Nothing was computed in their place. A number here would be about the soil, not the crop.`}
         </Panel>
       ) : null}
 
@@ -199,8 +248,48 @@ export function VegetationCard({ vegetation }: { vegetation: Vegetation }) {
   const provisional = [canopy, vegetation.vari, vegetation.exg, vegetation.tgi, vegetation.dgci]
     .some((b) => b && b.threshold_confirmed === false);
 
+  const lowCanopy = canopy?.status === 'INSUFFICIENT_CANOPY';
+  const band = vegetation.vari?.mean !== null ? vegetation.vari?.band : null;
+  const cover = canopy ? `${Math.round(canopy.mean * 100)}% ground covered` : null;
+  const summary = lowCanopy
+    ? `Too little crop in frame${cover ? ` · ${cover}` : ''}`
+    : [band ? (BAND_LABEL[band] ?? band.replace(/_/g, ' ')) : null, cover]
+        .filter(Boolean)
+        .join(' · ') || 'Not measured';
+
   return (
-    <Card eyebrow="Vegetation" title="How green, compared to itself">
+    <Card
+      eyebrow="Vegetation"
+      title="Greenness"
+      summary={summary}
+      summaryTone={lowCanopy ? 'warn' : band ? (BAND_TONE[band] ?? 'neutral') : 'neutral'}
+      // VEGETATION_BLOCK_SPEC §1.2: the caveat goes wherever a relative band
+      // is shown — which includes this folded summary line, so it sits under
+      // it rather than behind the tap.
+      note={relative && band ? VEGETATION_CAVEAT : undefined}
+      // The tile shows ground cover only. The relative greenness band needs
+      // its caveat beside it (§1.2), and a tile has no room for both, so the
+      // band lives one tap down, where the caveat panel opens first.
+      tile={
+        canopy
+          ? {
+              icon: <LeafIcon color={lowCanopy ? color.warningForeground : color.secondaryForeground} />,
+              label: 'GROUND COVER',
+              value: String(Math.round(canopy.mean * 100)),
+              unit: '%',
+              tone: lowCanopy ? 'warn' : 'good',
+              visual: (
+                <ProgressBar
+                  fraction={canopy.mean}
+                  tone={lowCanopy ? 'warn' : 'good'}
+                  tick={canopy.min_fraction_threshold}
+                />
+              ),
+              caption: lowCanopy ? 'Too little crop in frame to measure greenness' : 'Crop in frame. Tap for greenness',
+            }
+          : { icon: <LeafIcon color={color.unknown} />, label: 'GROUND COVER', value: 'Not measured', muted: true }
+      }
+    >
       {/* VEGETATION_BLOCK_SPEC §1.2, verbatim, on the screen, first. */}
       {relative ? (
         <Panel label="How to read this" tone="warn">
@@ -219,9 +308,7 @@ export function VegetationCard({ vegetation }: { vegetation: Vegetation }) {
             with no band, and showing an invented band for them would be
             manufacturing a comparison the pod did not make. */}
         <IndexRow label="VARI" index={vegetation.vari} />
-        <IndexRow label="ExG" index={vegetation.exg} showBand={false} />
-        <IndexRow label="TGI" index={vegetation.tgi} showBand={false} />
-        <IndexRow label="DGCI" index={vegetation.dgci} showBand={false} />
+        <OtherIndices exg={vegetation.exg} tgi={vegetation.tgi} dgci={vegetation.dgci} />
       </View>
 
       {/* Rule 2. Every one of these thresholds is engineering judgement on an
@@ -229,11 +316,10 @@ export function VegetationCard({ vegetation }: { vegetation: Vegetation }) {
           source. Rendering them like cited figures would be citation drift
           happening in the presentation layer. */}
       {provisional ? (
-        <Panel label="Thresholds · provisional" tone="warn">
-          None of the cut-offs on this card has been confirmed against a published source.
-          They are our own working values for an uncalibrated camera. The measurements are
-          real; where the lines sit between them is not yet settled.
-        </Panel>
+        <Text style={[type.small, { color: color.warningForeground, marginTop: space.sm }]}>
+          The cut-offs here are our own working values for an uncalibrated camera, not yet
+          confirmed against a published source. The measurements are real.
+        </Text>
       ) : null}
 
       <Divider />
@@ -255,6 +341,7 @@ export function VegetationCard({ vegetation }: { vegetation: Vegetation }) {
 
 const s = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  cells: { flexDirection: 'row', gap: space.md, marginTop: space.sm },
   indexRow: {
     flexDirection: 'row',
     alignItems: 'baseline',

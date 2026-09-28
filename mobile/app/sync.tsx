@@ -143,7 +143,7 @@ export default function SyncScreen() {
             <Row>
               <Muted>{progress.phase}</Muted>
               <Text style={[type.chipValue, { color: color.foreground }]}>
-                {progress.total > 0 ? `${progress.fetched} / ${progress.total}` : '—'}
+                {progress.total > 0 ? `${progress.fetched} / ${progress.total}` : 'starting'}
               </Text>
             </Row>
           </>
@@ -163,7 +163,7 @@ export default function SyncScreen() {
           <Panel label="The pod had been reset" tone="warn">
             The pod&apos;s stored scans had been cleared since this phone last spoke to
             it, so its numbering had started again from the beginning. Everything was
-            re-collected from scratch. Nothing on this phone was deleted — any scan the
+            re-collected from scratch. Nothing on this phone was deleted. Any scan the
             pod no longer has is still here, and this phone may now be the only copy.
           </Panel>
         ) : null}
@@ -233,7 +233,7 @@ export default function SyncScreen() {
               const r = await pullLatest();
               setCount(await countAdvisories());
               setImportNote({
-                text: `Pulled ${r.advisoryId}.${r.valid ? '' : ' It breaks the schema — open it to see how.'}`,
+                text: `Pulled ${r.advisoryId}.${r.valid ? '' : ' It breaks the schema. Open it to see how.'}`,
                 bad: !r.valid,
               });
             } catch (e) {
@@ -274,13 +274,13 @@ export default function SyncScreen() {
             <Row>
               <Muted>Advisories stored</Muted>
               <Text style={[type.valueSmall, { color: color.foreground }]}>
-                {health.advisory_count ?? '—'}
+                {health.advisory_count ?? 'unknown'}
               </Text>
             </Row>
             <Row>
               <Muted>Newest on the pod</Muted>
               <Text style={[type.valueSmall, { color: color.foreground }]}>
-                {health.latest_seq !== undefined ? `#${health.latest_seq}` : '—'}
+                {health.latest_seq !== undefined ? `#${health.latest_seq}` : 'unknown'}
               </Text>
             </Row>
             {health.storage_free_kb !== undefined ? (
@@ -365,7 +365,7 @@ export default function SyncScreen() {
 
         <Panel label="Not yet exercised on the device" tone="warn">
           The hardware team have not yet run this against the real Jetson. It is built to
-          the contract and may work first time — but if it fails, that is where to look
+          the contract and may work first time. If it fails, that is where to look
           before suspecting the phone.
         </Panel>
 
@@ -384,7 +384,7 @@ export default function SyncScreen() {
             try {
               const r = await triggerMastSync();
               setMastNote({
-                text: `The pod is going to collect from the field station now. It will drop its own Wi-Fi for about ${r.expected_ap_downtime_s} seconds and this phone will lose it. That is expected — wait, then pull again.`,
+                text: `The pod is going to collect from the field station now. It will drop its own Wi-Fi for about ${r.expected_ap_downtime_s} seconds and this phone will lose it. That is expected. Wait, then pull again.`,
                 bad: false,
               });
             } catch (e) {
@@ -483,7 +483,7 @@ export default function SyncScreen() {
       <Card eyebrow="Recovery" title="Import an advisory file">
         <Muted>
           Paste the contents of an advisory JSON file. It is validated and stored exactly
-          as a pulled one would be, and labelled as imported everywhere it appears —
+          as a pulled one would be, and labelled as imported everywhere it appears,
           because a file someone put on this phone is a weaker claim than a record the
           phone collected itself.
         </Muted>
@@ -509,7 +509,7 @@ export default function SyncScreen() {
               setImportNote({
                 text: r.valid
                   ? `Imported ${r.advisoryId}. It satisfies the schema.`
-                  : `Imported ${r.advisoryId}, but it breaks ${r.violations.length} schema rule${r.violations.length === 1 ? '' : 's'}. It is stored and flagged — open it to see which.`,
+                  : `Imported ${r.advisoryId}, but it breaks ${r.violations.length} schema rule${r.violations.length === 1 ? '' : 's'}. It is stored and flagged. Open it to see which.`,
                 bad: !r.valid,
               });
             } catch (e) {

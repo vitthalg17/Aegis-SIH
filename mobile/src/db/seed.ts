@@ -67,7 +67,7 @@ const FIXTURES: unknown[] = [
  * a way that discarding a synced record would not be. Only fixture-origin rows
  * are touched; a real advisory is never removed by this.
  */
-const FIXTURE_VERSION = '2026-09-21-contract-v1.0';
+const FIXTURE_VERSION = '2026-09-28-farmland-gps';
 
 /** Stored in place of a version once the samples were taken out on purpose. */
 const FIXTURES_REMOVED = 'removed';

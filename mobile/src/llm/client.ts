@@ -153,8 +153,8 @@ function describeFailure(err: unknown): string {
   }
   if (err instanceof APIConnectionError) {
     return (
-      'Could not reach the internet. This part of AEGIS needs a connection — ' +
-      'the advisory above does not, and is already complete without it.'
+      'Could not reach the internet. This part of AEGIS needs a connection. ' +
+      'The advisory above does not, and is already complete without it.'
     );
   }
   if (err instanceof APIError) {

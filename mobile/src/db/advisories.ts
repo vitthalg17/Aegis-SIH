@@ -121,7 +121,7 @@ export async function ingestAdvisory(
   const a = raw as Advisory;
 
   if (!a?.advisory_id) {
-    throw new Error('advisory has no advisory_id — cannot be stored or acknowledged');
+    throw new Error('advisory has no advisory_id, so it cannot be stored or acknowledged');
   }
 
   /**
@@ -245,6 +245,28 @@ export async function getAdvisory(advisoryId: string): Promise<StoredAdvisory | 
     advisoryId,
   );
   return row ? toStored(row) : null;
+}
+
+/**
+ * The newest advisories in full, for the home page's latest-scan card and its
+ * map. A row whose JSON will not parse is skipped here: it is still in the
+ * list, flagged, and has no positions or actions to contribute anyway.
+ */
+export async function listRecentAdvisories(limit = 20): Promise<StoredAdvisory[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<Row>(
+    `SELECT ${COLUMNS} FROM advisories ${ORDER} LIMIT ?`,
+    limit,
+  );
+  const out: StoredAdvisory[] = [];
+  for (const r of rows) {
+    try {
+      out.push(toStored(r));
+    } catch {
+      // Unparseable: see above.
+    }
+  }
+  return out;
 }
 
 export async function getLatestAdvisory(): Promise<StoredAdvisory | null> {

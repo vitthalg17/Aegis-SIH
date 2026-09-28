@@ -30,10 +30,19 @@ import {
   Row,
   SourceTag,
   StatusChip,
+  TONE,
   humaniseStatus,
-  statusDetail,
+  shortStatus,
 } from './components.tsx';
-import type { Tone } from './components.tsx';
+import type { TileSpec, Tone } from './components.tsx';
+import {
+  ArcGauge,
+  DropIcon,
+  GradientScale,
+  ProgressBar,
+  SatelliteIcon,
+  ThermometerIcon,
+} from './tiles.tsx';
 import { Meter, Stat } from './charts.tsx';
 import { color, space, type } from './theme.ts';
 import type { Irrigation, NdviProbe, NdviSatellite, Thermal } from '../schema/advisory.ts';
@@ -54,7 +63,7 @@ const CWSI_BANDS = [
 
 function cwsiBand(cwsi: number): { label: string; tone: Tone; copy: string } {
   if (cwsi < 0.2) return { label: 'NO STRESS', tone: 'good', copy: 'transpiring freely' };
-  if (cwsi < 0.4) return { label: 'MILD', tone: 'neutral', copy: 'early stress — keep watching' };
+  if (cwsi < 0.4) return { label: 'MILD', tone: 'neutral', copy: 'early stress, keep watching' };
   if (cwsi < 0.6) return { label: 'MODERATE', tone: 'warn', copy: 'irrigation advisable' };
   return { label: 'SEVERE', tone: 'bad', copy: 'irrigate' };
 }
@@ -63,19 +72,67 @@ const FLAG_COPY: Record<string, string> = {
   CWSI_BELOW_ZERO:
     'The canopy came out cooler than the wet reference pad, which should not happen. The value is shown exactly as measured rather than being clipped to zero, because a clipped value would hide that something is off with the pads or the shade on them.',
   CWSI_ABOVE_ONE:
-    'The canopy came out hotter than the dry reference pad. The value is shown exactly as measured rather than being clipped to one — either the crop is under severe stress, or the dry pad was shaded.',
+    'The canopy came out hotter than the dry reference pad. The value is shown exactly as measured rather than being clipped to one. Either the crop is under severe stress, or the dry pad was shaded.',
 };
 
 export function ThermalCard({ thermal }: { thermal: Thermal }) {
   const cwsi = typeof thermal.cwsi === 'number' ? thermal.cwsi : null;
   const band = cwsi !== null ? cwsiBand(cwsi) : null;
   const mock = thermal.thermal_source === 'mock';
+  const tc = typeof thermal.tc_c === 'number' ? thermal.tc_c : null;
+
+  // Folded reading: the stress band when there is one, else the leaf
+  // temperature with the index's gap named beside it — never the temperature
+  // alone, which would read as "no stress".
+  const summary = mock
+    ? 'Simulated, not a measurement'
+    : band
+      ? `Stress ${band.label.toLowerCase()} (${cwsi}) · leaf ${tc ?? '?'} °C`
+      : tc !== null
+        ? `Leaf ${tc.toFixed(1)} °C · stress not measured`
+        : shortStatus(thermal.reason);
+  const summaryTone: Tone = mock ? 'bad' : band ? band.tone : 'unknown';
+
+  // The tile leads with the stress index when there is one, on its dial. With
+  // no index it shows the leaf temperature on a cool-to-hot scale, and says in
+  // the caption that stress was not measured, so a mild-looking temperature
+  // cannot be read as "no stress".
+  const tile: TileSpec = mock
+    ? { icon: <ThermometerIcon color={color.destructive} />, label: 'WATER STRESS', value: 'Simulated', muted: true, caption: 'Not a measurement of your crop' }
+    : band && cwsi !== null
+      ? {
+          icon: <ThermometerIcon color={TONE[band.tone].fg} />,
+          label: 'WATER STRESS',
+          value: cwsi.toFixed(2),
+          tone: band.tone,
+          visual: <ArcGauge value={cwsi} bands={CWSI_BANDS} width={110} />,
+          caption: `${band.label.charAt(0)}${band.label.slice(1).toLowerCase()}${tc !== null ? ` · leaf ${tc.toFixed(1)} °C` : ''}`,
+        }
+      : tc !== null
+        ? {
+            icon: <ThermometerIcon color={color.foreground} />,
+            label: 'LEAF TEMP',
+            value: tc.toFixed(1),
+            unit: '°C',
+            visual: <GradientScale value={tc} min={10} max={45} kind="temperature" />,
+            caption: 'Water stress not measured',
+          }
+        : {
+            icon: <ThermometerIcon color={color.unknown} />,
+            label: 'WATER STRESS',
+            value: 'Not measured',
+            muted: true,
+            caption: shortStatus(thermal.reason),
+          };
 
   return (
     <Card
       eyebrow="Water stress"
-      title="Canopy temperature"
+      title="Water stress"
       right={mock ? <StatusChip label="SIMULATED" tone="bad" /> : undefined}
+      summary={summary}
+      summaryTone={summaryTone}
+      tile={tile}
     >
       {mock ? (
         <Panel label="Simulated sensor" tone="bad">
@@ -102,24 +159,13 @@ export function ThermalCard({ thermal }: { thermal: Thermal }) {
       <Divider />
 
       {cwsi === null ? (
-        <>
-          <Measurement
-            label="Water stress index"
-            value={null}
-            status={thermal.reason ?? 'UNAVAILABLE'}
-          />
-          {/* The specific, common, entirely legitimate case. Worth its own
-              words, because "unavailable" beside a working sensor reads as a
-              fault when it is a setup step. */}
-          {(thermal.reason ?? '').startsWith('THERMAL_REFS_NOT_CONFIGURED') ? (
-            <Panel label="What is actually missing" tone="warn">
-              The stress index compares the crop against two small reference pads — one
-              kept wet, one kept dry — that have to sit in the camera&apos;s view and be
-              registered on the pod. Those are not set up yet. The temperature above is
-              real; the index needs those pads and was left out rather than guessed.
-            </Panel>
-          ) : null}
-        </>
+        // `humaniseStatus` already explains the common case — reference pads
+        // not set up, temperature still real — in the panel's own words.
+        <Measurement
+          label="Water stress index"
+          value={null}
+          status={thermal.reason ?? 'UNAVAILABLE'}
+        />
       ) : (
         <>
           <View style={s.head}>
@@ -194,8 +240,40 @@ export function NdviCard({
   const sat = satellite ?? { available: false };
   const smallField = Boolean(sat.reliability_note);
 
+  const summary = sat.available
+    ? `Satellite ${typeof sat.ndvi_mean === 'number' ? sat.ndvi_mean.toFixed(2) : 'n/a'}${
+        typeof sat.age_days === 'number' ? ` · ${Math.round(sat.age_days)} days old` : ''
+      }${smallField ? ' · rough' : ''}`
+    : probe?.available
+      ? 'Infrared camera connected · no satellite image'
+      : `Not available: ${shortStatus(probe?.reason).toLowerCase()}`;
+
+  const tile: TileSpec =
+    sat.available && typeof sat.ndvi_mean === 'number'
+      ? {
+          icon: <SatelliteIcon color={smallField ? color.warningForeground : color.foreground} />,
+          label: 'SATELLITE',
+          value: sat.ndvi_mean.toFixed(2),
+          tone: smallField ? 'warn' : 'neutral',
+          visual: <GradientScale value={sat.ndvi_mean} min={0} max={0.9} kind="green" />,
+          caption: `Greenness from space${typeof sat.age_days === 'number' ? ` · ${Math.round(sat.age_days)} days old` : ''}${smallField ? ' · rough' : ''}`,
+        }
+      : {
+          icon: <SatelliteIcon color={color.unknown} />,
+          label: 'SATELLITE',
+          value: 'No image',
+          muted: true,
+          caption: sat.available ? 'Image had no usable pixels' : shortStatus(sat.reason),
+        };
+
   return (
-    <Card eyebrow="From above" title="Infrared greenness">
+    <Card
+      eyebrow="From above"
+      title="Infrared & satellite"
+      summary={summary}
+      summaryTone={sat.available ? (smallField ? 'warn' : 'neutral') : 'unknown'}
+      tile={tile}
+    >
       {/* The on-pod camera. */}
       <Text style={[type.chipLabel, { color: color.fgSubtle }]}>POD INFRARED CAMERA</Text>
       {probe?.available ? (
@@ -223,19 +301,19 @@ export function NdviCard({
         <>
           <View style={s.statRow}>
             <Stat
-              value={typeof sat.ndvi_mean === 'number' ? sat.ndvi_mean.toFixed(3) : '—'}
+              value={typeof sat.ndvi_mean === 'number' ? sat.ndvi_mean.toFixed(3) : 'n/a'}
               caption="Average greenness"
               tone={
                 typeof sat.ndvi_mean === 'number' && sat.ndvi_mean < 0.3 ? 'warn' : 'good'
               }
             />
             <Stat
-              value={typeof sat.age_days === 'number' ? `${Math.round(sat.age_days)} d` : '—'}
+              value={typeof sat.age_days === 'number' ? `${Math.round(sat.age_days)} d` : 'n/a'}
               caption="Image age"
               tone={typeof sat.age_days === 'number' && sat.age_days > 7 ? 'warn' : 'neutral'}
             />
             <Stat
-              value={typeof sat.valid_pixel_count === 'number' ? String(sat.valid_pixel_count) : '—'}
+              value={typeof sat.valid_pixel_count === 'number' ? String(sat.valid_pixel_count) : 'n/a'}
               caption="Clear pixels used"
               tone={smallField ? 'warn' : 'neutral'}
             />
@@ -290,19 +368,28 @@ export function IrrigationCard({ irrigation }: { irrigation: Irrigation }) {
 
   if (!ir.available) {
     return (
-      <Card eyebrow="Water" title="How much the crop will use">
+      <Card
+        eyebrow="Water"
+        title="Water the crop will use"
+        summary={`Not worked out: ${shortStatus(ir.reason).toLowerCase()}`}
+        summaryTone="unknown"
+        tile={{
+          icon: <DropIcon color={color.unknown} />,
+          label: 'WATER USE',
+          value: 'Not worked out',
+          muted: true,
+          caption: shortStatus(ir.reason),
+        }}
+      >
+        {/* The raw reason string ("need >=6 readings spanning >=6h …") used to
+            be printed under this panel as well. It is the developer's copy of
+            the same sentence; the humanised one says what matters. */}
         <Panel label="Not worked out" tone="unknown">
           {humaniseStatus(ir.reason ?? undefined)}
         </Panel>
-        {statusDetail(ir.reason ?? undefined) ? (
-          <Text style={[type.valueSmall, { color: color.fgSubtle, marginTop: 6 }]}>
-            {ir.reason}
-          </Text>
-        ) : null}
         <Text style={[type.small, { color: color.mutedForeground, marginTop: space.sm }]}>
-          This figure is worked out from air temperatures recorded by the field station
-          standing in your plot. Without that station reporting, there is no temperature
-          history to compute it from, and nothing was estimated in its place.
+          This is worked out from air temperatures recorded by the field station in your
+          plot. Nothing was estimated in its place.
         </Text>
       </Card>
     );
@@ -313,8 +400,25 @@ export function IrrigationCard({ irrigation }: { irrigation: Irrigation }) {
   return (
     <Card
       eyebrow="Water"
-      title="How much the crop will use"
+      title="Water the crop will use"
       right={ir.source ? <SourceTag source={ir.source} /> : undefined}
+      summary={etc !== null ? `${etc} mm per day` : 'Not worked out'}
+      summaryTone={etc !== null ? 'neutral' : 'unknown'}
+      tile={
+        etc !== null
+          ? {
+              icon: <DropIcon color="#1E6FB8" />,
+              label: 'WATER USE',
+              value: String(etc),
+              unit: 'mm/day',
+              // Against 10 mm/day, near the top of what a field crop draws.
+              visual: <ProgressBar fraction={etc / 10} tone="neutral" fill="#1E6FB8" track="#D6E6F5" />,
+              caption: ir.soil1_v == null && ir.soil2_v == null
+                ? 'Expected use. Soil moisture not measured'
+                : 'Expected use today',
+            }
+          : { icon: <DropIcon color={color.unknown} />, label: 'WATER USE', value: 'Not worked out', muted: true }
+      }
     >
       {etc !== null ? (
         <View style={s.heroRow}>

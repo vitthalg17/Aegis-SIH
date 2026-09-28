@@ -37,10 +37,12 @@ import {
   Muted,
   Panel,
   StatusChip,
+  TONE,
   VerificationBadge,
 } from './components.tsx';
 import type { Tone } from './components.tsx';
 import { EvidenceBar, Meter, Stat } from './charts.tsx';
+import { BugIcon, Dots } from './tiles.tsx';
 import { color, space, type } from './theme.ts';
 import type { PestFinding } from '../schema/advisory.ts';
 import { TRAP_COUNT_DISCLAIMER } from '../schema/advisory.ts';
@@ -81,7 +83,7 @@ const PEST_STATUS_BODY: Record<string, string> = {
   NOT_SAMPLED_BY_STICKY_TRAP:
     'A yellow sticky card is not how this pest is monitored, so no count is given for it. A count here would be a meaningless number rather than a low one. Stem borers are monitored on pheromone lure traps; planthoppers are counted by tapping the base of a hill over a tray. Ask your extension officer which applies to this one.',
   NO_PUBLISHED_ETL:
-    'The published guidance gives no action threshold for this pest, so there is nothing to compare the count against. That is the source being honest rather than a missing feature — treat the count as something to watch over time, not as a trigger.',
+    'The published guidance gives no action threshold for this pest, so there is nothing to compare the count against. That is the source being honest rather than a missing feature. Treat the count as something to watch over time, not as a trigger.',
   UNKNOWN_PEST:
     'The system does not have an entry for this pest, so it cannot say what a normal count looks like.',
   CARD_SATURATED:
@@ -223,7 +225,7 @@ function PestRow({ pest, index }: { pest: PestFinding; index: number }) {
             This breakdown comes from a model trained on traps in Europe and never checked
             against Indian field conditions. &quot;Small pale winged&quot; does not
             distinguish whitefly from thrips or aphids. It does not affect the count above
-            or the comparison against the limit — those come from the shape segmenter.
+            or the comparison against the limit. Those come from the shape segmenter.
           </Panel>
         </View>
       ) : null}
@@ -247,17 +249,65 @@ export function PestCard({ pest }: { pest: PestFinding[] }) {
 
   if (findings.length === 0) {
     return (
-      <Card eyebrow="Pest" title="Sticky trap">
+      <Card
+        eyebrow="Pest"
+        title="Sticky trap"
+        summary="No trap card photographed"
+        summaryTone="unknown"
+        tile={{
+          icon: <BugIcon color={color.unknown} />,
+          label: 'STICKY TRAP',
+          value: 'No card',
+          muted: true,
+          caption: 'No trap card photographed',
+        }}
+      >
         <Muted>
           No trap count in this advisory. A card has to be photographed and sent to the pod
-          before there is anything to count — nothing is assumed in the meantime.
+          before there is anything to count. Nothing is assumed in the meantime.
         </Muted>
       </Card>
     );
   }
 
+  // Folded: the status per pest, never the raw count — the count is a
+  // deliberate over-estimate and its disclaimer lives with it, one tap down.
+  const worst =
+    findings.find((p) => p.status === 'ABOVE_ETL') ?? findings.find((p) => p.status === 'AT_ETL');
+  const summary = findings
+    .map(
+      (p) =>
+        `${describeTaxon(p.target_pest_context)}: ${(
+          PEST_STATUS_LABEL[String(p.status)] ?? String(p.status).replace(/_/g, ' ')
+        ).toLowerCase()}`,
+    )
+    .join(' · ');
+
+  // The tile counts pests past their limit, not insects on the card. The card
+  // total is a deliberate over-estimate whose disclaimer must travel with it,
+  // so it stays one tap down, beside that disclaimer.
+  const over = findings.filter((p) => p.status === 'ABOVE_ETL' || p.status === 'AT_ETL');
+  const tileTone: Tone = over.length > 0 ? 'bad' : 'good';
+
   return (
-    <Card eyebrow="Pest" title="Sticky trap">
+    <Card
+      eyebrow="Pest"
+      title="Sticky trap"
+      summary={summary}
+      summaryTone={worst ? (PEST_TONE[String(worst.status)] ?? 'warn') : 'neutral'}
+      tile={{
+        icon: <BugIcon color={TONE[tileTone].fg} />,
+        label: 'STICKY TRAP',
+        value: over.length > 0 ? `${over.length} over` : 'Below',
+        unit: over.length > 0 ? 'the limit' : 'the limits',
+        tone: tileTone,
+        visual: <Dots tones={findings.map((p) => PEST_TONE[String(p.status)] ?? 'unknown')} />,
+        caption:
+          over.length > 0
+            ? over.map((p) => describeTaxon(p.target_pest_context)).join(', ')
+            : `${findings.length} pest${findings.length === 1 ? '' : 's'} checked`,
+      }}
+    >
       {findings.map((p, i) => (
         <PestRow key={`${p.target_pest_context}-${i}`} pest={p} index={i} />
       ))}
