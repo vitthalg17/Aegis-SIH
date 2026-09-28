@@ -20,6 +20,7 @@
     "android": {
       "package": "in.sih.aegis",
       "edgeToEdgeEnabled": true,
+      "allowBackup": false,
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",

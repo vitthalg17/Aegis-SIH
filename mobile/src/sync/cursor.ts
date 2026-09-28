@@ -87,8 +87,9 @@ export type CursorEntry = {
  * through an unbroken run of settled records, and stops at the first one that
  * is not.
  *
- * "Settled" means the phone holds it, or it can never be fetched (a 404, 410
- * or mock refusal).
+ * "Settled" means the phone holds it. A record the pod listed but failed to
+ * serve — a 404 included — is never settled: the pod's own manifest says it
+ * exists, so a failed fetch is a gap to retry, not a record to step over.
  *
  * ── The failure this prevents ───────────────────────────────────────────────
  * "Just get the newest scan" stores seq 7 without walking the manifest. The

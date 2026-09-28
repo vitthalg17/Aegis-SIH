@@ -121,9 +121,19 @@ export function DiseaseCard({ advisory }: { advisory: Advisory }) {
     );
   }
 
+  // One row per class, as the contract defines `disease[]`. The pod has sent
+  // the same class twice (wheat__brown_rust at 0.89 and 0.86, 25 Sep replay);
+  // both rows joined to the same detections, so they were one finding drawn
+  // twice. Keep the stronger.
+  const byClass = new Map<string, (typeof disease)[number]>();
+  for (const d of disease) {
+    const seen = byClass.get(d.class);
+    if (!seen || d.confidence > seen.confidence) byClass.set(d.class, d);
+  }
+
   // Strongest first. The pod orders these, but not by contract, and the
   // reliability caveats read worst when the order is arbitrary.
-  const ordered = [...disease].sort((a, b) => b.confidence - a.confidence);
+  const ordered = [...byClass.values()].sort((a, b) => b.confidence - a.confidence);
 
   return (
     <Card eyebrow="Findings" title="What the camera called">

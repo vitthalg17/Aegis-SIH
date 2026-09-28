@@ -31,6 +31,7 @@ import {
   SourceTag,
   StatusChip,
   humaniseStatus,
+  statusDetail,
 } from './components.tsx';
 import type { Tone } from './components.tsx';
 import { Meter, Stat } from './charts.tsx';
@@ -293,6 +294,11 @@ export function IrrigationCard({ irrigation }: { irrigation: Irrigation }) {
         <Panel label="Not worked out" tone="unknown">
           {humaniseStatus(ir.reason ?? undefined)}
         </Panel>
+        {statusDetail(ir.reason ?? undefined) ? (
+          <Text style={[type.valueSmall, { color: color.fgSubtle, marginTop: 6 }]}>
+            {ir.reason}
+          </Text>
+        ) : null}
         <Text style={[type.small, { color: color.mutedForeground, marginTop: space.sm }]}>
           This figure is worked out from air temperatures recorded by the field station
           standing in your plot. Without that station reporting, there is no temperature

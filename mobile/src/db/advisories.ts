@@ -269,7 +269,8 @@ export async function knownAdvisoryIds(): Promise<Set<string>> {
 /**
  * Removes the shipped sample advisories, leaving everything real untouched.
  *
- * Only ever called with a fixture set that has gone stale. Invented data is not
+ * Called when the fixture set has gone stale, or when someone takes the samples
+ * out from the pod screen. Invented data is not
  * evidence of anything, so replacing it wholesale is safe in a way that
  * discarding a synced record would not be.
  */

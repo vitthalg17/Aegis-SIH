@@ -283,7 +283,11 @@ export function Stat({
 }) {
   return (
     <View style={s.stat}>
+      {/* One line, shrunk to fit: a word like "untested" in a third-width
+          column otherwise breaks mid-word as "untest / ed". */}
       <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
         style={[
           hero ? type.hero : type.stat,
           { color: tone === 'neutral' ? color.foreground : TONE_FILL[tone] },

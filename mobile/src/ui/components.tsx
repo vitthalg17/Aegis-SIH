@@ -233,7 +233,8 @@ export function Measurement({
     <View style={s.measurement}>
       <View style={s.measurementHead}>
         <Text style={[type.chipLabel, { color: color.fgSubtle }]}>{label.toUpperCase()}</Text>
-        {source ? <SourceTag source={source} /> : null}
+        {/* No value, no provenance: a MEASURED tag over NOT MEASURED says both. */}
+        {source && !absent ? <SourceTag source={source} /> : null}
       </View>
 
       {absent ? (
@@ -349,6 +350,16 @@ export function humaniseStatus(status?: string): string {
     // -- Irrigation ----------------------------------------------------------
     case 'INSUFFICIENT_TEMPERATURE_HISTORY':
       return 'Not enough temperature readings came back from the field station in the last day to work out water use.';
+    case 'INSUFFICIENT_24H_HISTORY': {
+      // "(need >=6 readings spanning >=6h in last 24h ..., found 26 readings
+      // spanning 4.9h, ...)" — pull the two spans out; the rest stays as detail.
+      const need = /need[^,]*?spanning\s*>=\s*([\d.]+)\s*h/.exec(status ?? '')?.[1];
+      const found = /found[^,]*?spanning\s*([\d.]+)\s*h/.exec(status ?? '')?.[1];
+      return (
+        `The field station needs ${need ? `at least ${need} hours` : 'more hours'} of readings from the last day to work this out.` +
+        (found ? ` It has ${found} hours so far.` : '')
+      );
+    }
 
     // -- Vegetation ----------------------------------------------------------
     case 'INSUFFICIENT_CANOPY_FRACTION':

@@ -69,6 +69,9 @@ const FIXTURES: unknown[] = [
  */
 const FIXTURE_VERSION = '2026-09-21-contract-v1.0';
 
+/** Stored in place of a version once the samples were taken out on purpose. */
+const FIXTURES_REMOVED = 'removed';
+
 /**
  * Seeds the fixtures, and replaces them when they go stale.
  *
@@ -77,6 +80,10 @@ const FIXTURE_VERSION = '2026-09-21-contract-v1.0';
  */
 export async function seedFixturesIfEmpty(): Promise<number> {
   const seeded = await getState('fixtures_version');
+
+  // Removed from the pod screen. Stays removed until reloaded from there, or
+  // until the replica is cleared.
+  if (seeded === FIXTURES_REMOVED) return 0;
 
   // The fixtures changed under a replica that already holds the old ones.
   // Swap them rather than leaving a record the current renderer cannot read.
@@ -99,6 +106,16 @@ export async function seedFixturesIfEmpty(): Promise<number> {
 async function insertFixtures(): Promise<number> {
   for (const f of FIXTURES) await ingestAdvisory(f, { origin: 'fixture' });
   return FIXTURES.length;
+}
+
+/**
+ * Demo affordance: take the sample advisories out, leaving every real one.
+ * Recorded, so the next launch does not seed them straight back in.
+ */
+export async function removeFixtures(): Promise<number> {
+  const n = await deleteFixtures();
+  await setState('fixtures_version', FIXTURES_REMOVED);
+  return n;
 }
 
 /** Demo affordance: force the fixtures back in after a reset. */

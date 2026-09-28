@@ -455,9 +455,12 @@ const REPLAY_THERMAL_BODY =
   'This scan is a replay of a recorded video. The thermal camera was connected, but it was not looking at the scene in the video, so its reading was left out rather than attached to the wrong field.';
 
 function isReplayThermal(input: AdvisoryInput, thermalReason?: string | null): boolean {
+  // Keyed on the reason, not on ABSENT alone: whatever status the pod gives the
+  // input, a reading dropped for this reason was not used. A simulated sensor
+  // still says SIMULATED — that is the more important thing to know.
   return (
     input.name === 'pod_thermal' &&
-    input.status === 'ABSENT' &&
+    input.status !== 'MOCK_PROVISIONAL' &&
     (thermalReason ?? '').split(' (')[0] === 'REPLAY_THERMAL_NOT_OF_SCENE'
   );
 }

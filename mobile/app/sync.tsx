@@ -27,7 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { countAdvisories, importAdvisoryFromText } from '../src/db/advisories.ts';
 import { resetReplica } from '../src/db/client.ts';
-import { reseedFixtures } from '../src/db/seed.ts';
+import { removeFixtures, reseedFixtures } from '../src/db/seed.ts';
 import {
   DEFAULT_BASE_URL,
   POD_SSID,
@@ -168,17 +168,14 @@ export default function SyncScreen() {
           </Panel>
         ) : null}
 
-        {lastOutcome?.ok ? (
+        {/* Shown for a partial pull too, so "2 new, 1 failed" is visible
+            rather than hidden behind the failure panel. */}
+        {lastOutcome && (lastOutcome.ok || lastOutcome.failed.length > 0) ? (
           <ChipRow>
             <Chip label="NEW" value={String(lastOutcome.fetched)} tone="good" />
             <Chip label="ALREADY HELD" value={String(lastOutcome.skipped)} />
-            {lastOutcome.gone > 0 ? (
-              <Chip label="NO LONGER ON POD" value={String(lastOutcome.gone)} tone="unknown" />
-            ) : null}
-            {/* The production guard working. Not a failure, and it reads as one
-                unless it is counted and named separately. */}
-            {lastOutcome.refusedMock > 0 ? (
-              <Chip label="REFUSED AS SIMULATED" value={String(lastOutcome.refusedMock)} tone="warn" />
+            {lastOutcome.failed.length > 0 ? (
+              <Chip label="FAILED" value={String(lastOutcome.failed.length)} tone="bad" />
             ) : null}
             {lastOutcome.invalid > 0 ? (
               <Chip label="VIOLATIONS" value={String(lastOutcome.invalid)} tone="bad" />
@@ -189,19 +186,17 @@ export default function SyncScreen() {
 
       <Card eyebrow="Pod" title="How to connect">
         <Muted>
-          Join the Wi-Fi network {POD_SSID}. The pod broadcasts it the whole time it is
-          switched on — there is nothing to wait for and no button to press. Android will
-          say &quot;connected, no internet&quot;, which is correct: the pod is not a route
-          to the internet.
+          Put this phone and the pod on the same WiFi network, then pull. Once the
+          pod&apos;s own network ({POD_SSID}) is set up, joining it will be all it takes.
+          Android will say &quot;connected, no internet&quot; on that network, which is
+          correct: the pod is not a route to the internet.
         </Muted>
 
         {/* The access point itself does not exist yet. Better said here, once,
             than discovered by three people separately. */}
         <Panel label="Not yet broadcasting" tone="warn">
-          The pod&apos;s Wi-Fi access point is waiting on a replacement USB adapter, so
-          {' '}{POD_SSID} is not on the air yet. Everything below has been proven over a
-          wired link to the device, not over that radio. Until the adapter lands, point
-          this at a laptop running the test station, or use the file import further down.
+          The pod&apos;s own WiFi network ({POD_SSID}) isn&apos;t set up yet. For now the
+          phone and pod share a phone hotspot; enter the pod&apos;s address below.
         </Panel>
 
         <TextInput
@@ -586,6 +581,18 @@ export default function SyncScreen() {
         >
           <Text style={[type.label, { color: color.secondaryForeground }]}>
             Reload sample advisories
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={async () => {
+            await removeFixtures();
+            setCount(await countAdvisories());
+          }}
+          style={({ pressed }) => [s.button, s.buttonSecondary, pressed && { opacity: 0.6 }]}
+        >
+          <Text style={[type.label, { color: color.secondaryForeground }]}>
+            Remove sample advisories (keeps real ones)
           </Text>
         </Pressable>
 

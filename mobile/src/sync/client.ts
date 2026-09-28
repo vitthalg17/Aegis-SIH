@@ -29,9 +29,9 @@
  * with two exceptions they named: `POST /api/v1/trap/upload` and
  * `POST /api/v1/sync/trigger`. Both are implemented here, and both are flagged
  * at their call sites so the UI can say "not yet exercised on the device"
- * rather than presenting a failure as the app's fault. The SIH-FIELD access
- * point is also still waiting on a replacement AR9271 dongle, so nothing below
- * has been run over the radio it will ship on.
+ * rather than presenting a failure as the app's fault. The pull has since been
+ * run against the real pod over WiFi, with phone and pod sharing a phone
+ * hotspot; the pod's own SIH-FIELD access point is not set up yet.
  */
 
 import { ingestAdvisory, knownAdvisoryIds } from '../db/advisories.ts';
@@ -134,10 +134,12 @@ export type SyncOutcome = {
   /** Advisories that arrived but broke a schema rule. Stored, flagged, surfaced. */
   invalid: number;
   skipped: number;
-  /** Records the pod no longer has. Not an error — it will never have them again. */
-  gone: number;
-  /** Advisories the gateway refused because they were produced by a mock backend. */
-  refusedMock: number;
+  /**
+   * Advisories the manifest listed that did not come across, with why. Any
+   * entry here makes the pull a failure: nothing is acknowledged and the cursor
+   * stops below the first of them, so the next pull asks for them again.
+   */
+  failed: FailedFetch[];
   /**
    * The pod's `seq` numbering restarted — it was wiped or reflashed — so the
    * cursor was rewound and everything re-pulled. Reported rather than handled
@@ -147,6 +149,12 @@ export type SyncOutcome = {
   podReset: boolean;
   cursor: number | null;
   error?: string;
+};
+
+export type FailedFetch = {
+  advisoryId: string;
+  /** The sentence that goes on screen. */
+  reason: string;
 };
 
 export type SyncProgress = {
@@ -534,13 +542,12 @@ export async function syncNow(onProgress?: (p: SyncProgress) => void): Promise<S
   let fetched = 0;
   let invalid = 0;
   let skipped = 0;
-  let gone = 0;
-  let refusedMock = 0;
+  const failed: FailedFetch[] = [];
   let podReset = false;
 
   // Everything the manifest listed, and the ids from it that are settled: held
-  // in the replica, or final (404, 410, refused as mock). The cursor is derived
-  // from these two rather than tracked by hand. See `advanceCursor`.
+  // in the replica. The cursor is derived from these two rather than tracked by
+  // hand. See `advanceCursor`.
   const entries: ManifestEntry[] = [];
   const settled = new Set<string>();
   const landed = () => advanceCursor(startCursor, entries, settled);
@@ -554,8 +561,7 @@ export async function syncNow(onProgress?: (p: SyncProgress) => void): Promise<S
       fetched,
       invalid,
       skipped,
-      gone,
-      refusedMock,
+      failed,
       podReset,
       cursor: lastLanded,
       error,
@@ -672,28 +678,24 @@ export async function syncNow(onProgress?: (p: SyncProgress) => void): Promise<S
       // Resumability: the cursor follows what committed, not what was listed.
       settled.add(entry.advisory_id);
     } catch (err) {
-      // A 404 or 410 is final — the record will not appear later, so stopping
-      // here would wedge the sync on it forever. Step over it and keep going.
-      if (err instanceof HttpError && (err.status === 404 || err.status === 410)) {
-        gone++;
-        settled.add(entry.advisory_id);
-        continue;
-      }
-      // The production guard refusing a mock advisory is also final, and it is
-      // the gateway working: it will never serve that record while it is in
-      // production mode. Counted separately so the screen can say "three were
-      // refused as simulated" rather than "three are missing".
-      if (err instanceof HttpError && err.isMockRejection) {
-        refusedMock++;
-        settled.add(entry.advisory_id);
-        continue;
-      }
-      // Anything else is a gap we might recover from. Stop rather than skip
-      // past it: advancing the cursor over a record we failed to fetch would
-      // lose it permanently.
-      return fail(explain(err, url));
+      // No failed fetch is treated as final. The manifest listed this record,
+      // so the pod says it exists; a 404 for it is a pod fault (the gateway once
+      // 404'd every id it failed to URL-decode), not proof it is gone. Stepping
+      // over it would move the cursor past it and lose it for good.
+      failed.push({ advisoryId: entry.advisory_id, reason: fetchFailureReason(err, url) });
+      // A 4xx is an answer about this one record from a pod that is up, so the
+      // records after it are still worth fetching — the replica holds them, and
+      // the cursor stays below the gap regardless. Anything else (timeout,
+      // dropped link, 5xx after the retry) will fail the same way for the next
+      // record, so stop.
+      if (err instanceof HttpError && err.status >= 400 && err.status < 500) continue;
+      break;
     }
   }
+
+  // A pull that missed anything is not a success. No ack, no "synced just now":
+  // the cursor stops below the first gap and the next pull asks for it again.
+  if (failed.length > 0) return fail(describeFailedFetches(failed, fetched, wanted.length));
 
   // ---- Ack ----------------------------------------------------------------
   // A courtesy, not a contract. The pod keeps serving records it has already
@@ -724,5 +726,25 @@ export async function syncNow(onProgress?: (p: SyncProgress) => void): Promise<S
   await setState('last_sync_error', null);
   onProgress?.({ phase: 'done', fetched, total: wanted.length });
 
-  return { ok: true, fetched, invalid, skipped, gone, refusedMock, podReset, cursor: lastLanded };
+  return { ok: true, fetched, invalid, skipped, failed, podReset, cursor: lastLanded };
+}
+
+/** Why one advisory did not come across, worded for the sync screen. */
+function fetchFailureReason(err: unknown, url: string): string {
+  if (err instanceof HttpError && err.status === 404) {
+    return 'The pod listed it but answered "not found" (404) when asked for it. That is a fault on the pod, not on this phone.';
+  }
+  return explain(err, url);
+}
+
+function describeFailedFetches(failed: FailedFetch[], fetched: number, total: number): string {
+  const head =
+    failed.length === 1
+      ? `Could not download advisory ${failed[0].advisoryId}. ${failed[0].reason}`
+      : `Could not download ${failed.length} advisories:\n` +
+        failed.map((f) => `• ${f.advisoryId}: ${f.reason}`).join('\n');
+  return (
+    `${head}\n\nGot ${fetched} of ${total} new. Nothing was skipped: the next pull ` +
+    'will ask for the missing ones again.'
+  );
 }

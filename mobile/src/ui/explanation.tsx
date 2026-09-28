@@ -20,7 +20,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { getExplanation, saveExplanation } from '../db/explanations.ts';
-import { configSummary, explainAdvisory, isConfigured } from '../llm/client.ts';
+import { explainAdvisory, isConfigured } from '../llm/client.ts';
 import type { Figure } from '../llm/guard.ts';
 import { LANGUAGES } from '../llm/prompt.ts';
 import type { Language } from '../llm/prompt.ts';
@@ -176,7 +176,8 @@ function Body({ state, onGenerate }: { state: State; onGenerate: () => void }) {
         </>
       ) : (
         <Panel label="Not configured" tone="unknown">
-          {`No LLM endpoint is set, so explanations cannot be generated on this build. Everything else on this screen works without one. (${configSummary()})`}
+          No LLM endpoint is set, so explanations cannot be generated on this build.
+          Everything else on this screen works without one.
         </Panel>
       );
 
