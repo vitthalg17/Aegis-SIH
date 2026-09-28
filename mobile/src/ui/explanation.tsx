@@ -24,6 +24,7 @@ import { explainAdvisory, isConfigured } from '../llm/client.ts';
 import type { Figure } from '../llm/guard.ts';
 import { LANGUAGES } from '../llm/prompt.ts';
 import type { Language } from '../llm/prompt.ts';
+import { currentLanguage, dateLocale, tr } from '../i18n/tr.ts';
 import type { Advisory } from '../schema/advisory.ts';
 import { Card, Panel, StatusChip } from './components.tsx';
 import { color, radius, space, type } from './theme.ts';
@@ -37,7 +38,8 @@ type State =
   | { phase: 'error'; reason: string };
 
 export function ExplanationCard({ advisory }: { advisory: Advisory }) {
-  const [language, setLanguage] = useState<Language>('en');
+  // Starts on the app's language; the picker below can still switch it.
+  const [language, setLanguage] = useState<Language>(currentLanguage());
   const [state, setState] = useState<State>({ phase: 'loading' });
 
   // Reload from the cache whenever the language changes — each language is its
@@ -97,9 +99,9 @@ export function ExplanationCard({ advisory }: { advisory: Advisory }) {
   return (
     <View>
       <Card
-        eyebrow="Generated · not a measurement"
-        title="In plain language"
-        right={<StatusChip label="AI" tone="unknown" />}
+        eyebrow={tr('Generated · not a measurement')}
+        title={tr('In plain language')}
+        right={<StatusChip label={tr('AI')} tone="unknown" />}
       >
         <Text
           style={[
@@ -107,8 +109,7 @@ export function ExplanationCard({ advisory }: { advisory: Advisory }) {
             { color: color.mutedForeground, marginBottom: space.md },
           ]}
         >
-          Written by AI from the readings above. Every figure is checked against them, and
-          the advice itself comes from the readings, not the AI.
+          {tr('Written by AI from the readings above. Every figure is checked against them, and the advice itself comes from the readings, not the AI.')}
         </Text>
 
         <LanguagePicker value={language} onChange={setLanguage} />
@@ -171,15 +172,13 @@ function Body({ state, onGenerate }: { state: State; onGenerate: () => void }) {
       return isConfigured() ? (
         <>
           <Text style={[type.small, { color: color.mutedForeground, marginBottom: space.sm }]}>
-            Not generated yet. This step needs an internet connection. The advisory
-            above does not.
+            {tr('Not generated yet. This step needs an internet connection. The advisory above does not.')}
           </Text>
-          <GenerateButton onPress={onGenerate} label="Explain this advisory" />
+          <GenerateButton onPress={onGenerate} label={tr('Explain this advisory')} />
         </>
       ) : (
-        <Panel label="Not configured" tone="unknown">
-          No LLM endpoint is set, so explanations cannot be generated on this build.
-          Everything else on this screen works without one.
+        <Panel label={tr('Not configured')} tone="unknown">
+          {tr('No LLM endpoint is set, so explanations cannot be generated on this build. Everything else on this screen works without one.')}
         </Panel>
       );
 
@@ -188,7 +187,7 @@ function Body({ state, onGenerate }: { state: State; onGenerate: () => void }) {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
           <ActivityIndicator color={color.primary} />
           <Text style={[type.small, { color: color.mutedForeground }]}>
-            Writing the explanation…
+            {tr('Writing the explanation…')}
           </Text>
         </View>
       );
@@ -218,12 +217,12 @@ function Body({ state, onGenerate }: { state: State; onGenerate: () => void }) {
             ))}
           </View>
           <Text style={[type.micro, { color: color.fgSubtle, marginTop: space.sm }]}>
-            {`GENERATED ${new Date(state.generatedAtUtc)
-              .toLocaleString()
+            {`${tr('GENERATED')} ${new Date(state.generatedAtUtc)
+              .toLocaleString(dateLocale())
               .toUpperCase()} · ${state.model.toUpperCase()}`}
           </Text>
           <View style={{ marginTop: space.sm }}>
-            <GenerateButton onPress={onGenerate} label="Write it again" subtle />
+            <GenerateButton onPress={onGenerate} label={tr('Write it again')} subtle />
           </View>
         </>
       );
@@ -234,13 +233,13 @@ function Body({ state, onGenerate }: { state: State; onGenerate: () => void }) {
     case 'rejected':
       return (
         <>
-          <Panel label="Explanation refused" tone="bad">
-            {`The model wrote ${state.offending.length === 1 ? 'a figure that is' : 'figures that are'} not in this advisory: ${state.offending
-              .map((f) => f.raw)
-              .join(', ')}. It was discarded rather than shown. A number that was never measured must not reach this screen.`}
+          <Panel label={tr('Explanation refused')} tone="bad">
+            {tr('The model wrote figures that are not in this advisory: {figs}. It was discarded rather than shown. A number that was never measured must not reach this screen.', {
+              figs: state.offending.map((f) => f.raw).join(', '),
+            })}
           </Panel>
           <View style={{ marginTop: space.sm }}>
-            <GenerateButton onPress={onGenerate} label="Try again" subtle />
+            <GenerateButton onPress={onGenerate} label={tr('Try again')} subtle />
           </View>
         </>
       );
@@ -248,11 +247,11 @@ function Body({ state, onGenerate }: { state: State; onGenerate: () => void }) {
     case 'error':
       return (
         <>
-          <Panel label="Could not generate" tone="warn">
+          <Panel label={tr('Could not generate')} tone="warn">
             {state.reason}
           </Panel>
           <View style={{ marginTop: space.sm }}>
-            <GenerateButton onPress={onGenerate} label="Try again" subtle />
+            <GenerateButton onPress={onGenerate} label={tr('Try again')} subtle />
           </View>
         </>
       );

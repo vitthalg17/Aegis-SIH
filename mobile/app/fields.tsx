@@ -19,6 +19,8 @@ import { formatWhen } from '../src/ui/advisory.tsx';
 import { Muted, StatusChip } from '../src/ui/components.tsx';
 import { ScanRow, looksHealthy, needsLook, rowVerdict } from '../src/ui/scan-row.tsx';
 import { useStatusBarStyle } from '../src/ui/status-bar.ts';
+import { useLanguage } from '../src/i18n/language.tsx';
+import { tr } from '../src/i18n/tr.ts';
 import { color, radius, shadow, space, type } from '../src/ui/theme.ts';
 
 /** How many of a field's scans show under its headline. */
@@ -27,6 +29,7 @@ const RECENT = 3;
 export default function FieldsScreen() {
   const [rows, setRows] = useState<AdvisorySummary[]>([]);
   useStatusBarStyle('dark');
+  useLanguage();
 
   useFocusEffect(
     useCallback(() => {
@@ -52,7 +55,7 @@ export default function FieldsScreen() {
     >
       {ordered.length === 0 ? (
         <View style={s.card}>
-          <Muted>No scans yet, so no fields to show.</Muted>
+          <Muted>{tr('No scans yet, so no fields to show.')}</Muted>
         </View>
       ) : null}
 
@@ -63,19 +66,24 @@ export default function FieldsScreen() {
         // was too unclear to call says so rather than "nothing flagged".
         const badge =
           look > 0
-            ? { label: `${look} NEED${look === 1 ? 'S' : ''} A LOOK`, tone: 'bad' as const }
+            ? {
+                label: look === 1 ? tr('1 NEEDS A LOOK') : tr('{n} NEED A LOOK', { n: look }),
+                tone: 'bad' as const,
+              }
             : looksHealthy(latest)
-              ? { label: 'LOOKS HEALTHY', tone: 'good' as const }
+              ? { label: tr('LOOKS HEALTHY'), tone: 'good' as const }
               : { label: rowVerdict(latest).text.toUpperCase(), tone: 'warn' as const };
         return (
           <View key={fieldId || 'none'} style={s.field}>
             <View style={s.head}>
               <View style={{ flex: 1 }}>
                 <Text style={[type.title, { color: color.foreground }]}>
-                  {fieldId ? `Field ${fieldId}` : 'No field'}
+                  {fieldId ? tr('Field {id}', { id: fieldId }) : tr('No field')}
                 </Text>
                 <Text style={[type.small, { color: color.mutedForeground, marginTop: 2 }]}>
-                  {`Last scanned ${formatWhen(latest.generatedAtUtc)} · ${scans.length} scan${scans.length === 1 ? '' : 's'}`}
+                  {`${tr('Last scanned {when}', { when: formatWhen(latest.generatedAtUtc) })} · ${
+                    scans.length === 1 ? tr('1 scan') : tr('{n} scans', { n: scans.length })
+                  }`}
                 </Text>
               </View>
               <StatusChip label={badge.label} tone={badge.tone} />
@@ -88,7 +96,7 @@ export default function FieldsScreen() {
             ))}
             {scans.length > RECENT ? (
               <Text style={[type.small, { color: color.fgSubtle }]}>
-                {`${scans.length - RECENT} older scan${scans.length - RECENT === 1 ? '' : 's'} on the Scans tab.`}
+                {tr('{n} older scans on the All scans list.', { n: scans.length - RECENT })}
               </Text>
             ) : null}
           </View>

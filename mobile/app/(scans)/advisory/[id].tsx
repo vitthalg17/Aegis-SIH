@@ -51,6 +51,8 @@ import type { Language } from '../../../src/schema/templates.ts';
 import { fieldIdFromAdvisoryId } from '../../../src/schema/advisory.ts';
 import { useStatusBarStyle } from '../../../src/ui/status-bar.ts';
 import { color, space, type } from '../../../src/ui/theme.ts';
+import { useLanguage } from '../../../src/i18n/language.tsx';
+import { tr } from '../../../src/i18n/tr.ts';
 
 export default function AdvisoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -63,7 +65,11 @@ export default function AdvisoryScreen() {
    * model over the internet. Sharing one control would suggest the two have the
    * same availability, and in a field they emphatically do not.
    */
-  const [language, setLanguage] = useState<Language>('en');
+  const { language: appLanguage } = useLanguage();
+  const [language, setLanguage] = useState<Language>(appLanguage);
+  // Follows the app language when that changes; the card's own switch can
+  // still flip it for one scan, for reading the same advice in the other.
+  useEffect(() => setLanguage(appLanguage), [appLanguage]);
   const insets = useSafeAreaInsets();
   useStatusBarStyle('dark');
 
@@ -77,7 +83,7 @@ export default function AdvisoryScreen() {
   if (!stored) {
     return (
       <View style={{ flex: 1, padding: space.lg, backgroundColor: color.background }}>
-        <Muted>No advisory with that id in the local store.</Muted>
+        <Muted>{tr('No advisory with that id in the local store.')}</Muted>
       </View>
     );
   }
@@ -103,25 +109,23 @@ export default function AdvisoryScreen() {
         contentContainerStyle={{ padding: space.lg, paddingBottom: insets.bottom + space.xl }}
       >
         <OriginBanner origin={stored.origin} />
-        <Text style={[type.title, { color: color.foreground }]}>This advisory cannot be shown</Text>
+        <Text style={[type.title, { color: color.foreground }]}>{tr('This advisory cannot be shown')}</Text>
         <Text style={[type.valueSmall, { color: color.mutedForeground, marginBottom: space.lg }]}>
           {a?.advisory_id ?? id}
         </Text>
-        <Card eyebrow="Older format" title="What is missing">
+        <Card eyebrow={tr('Older format')} title={tr('What is missing')}>
           <Muted>
-            This record was stored before the app moved to the current advisory format, so
-            it does not carry everything the screen now reads. It is kept rather than
-            deleted, but it cannot be rendered.
+            {tr('This record was stored before the app moved to the current advisory format, so it does not carry everything the screen now reads. It is kept rather than deleted, but it cannot be rendered.')}
           </Muted>
           <View style={{ marginTop: space.md }}>
             {missing.map((m) => (
               <Text key={m} style={[type.valueSmall, { color: color.destructive, marginBottom: 2 }]}>
-                • missing “{m}”
+                • {tr('missing "{m}"', { m })}
               </Text>
             ))}
           </View>
           <Muted>
-            Pull again from the pod, or clear the replica on the pod screen, to replace it.
+            {tr('Pull again from the pod, or clear the replica on the pod screen, to replace it.')}
           </Muted>
         </Card>
         <ViolationsCard violations={stored.violations} />
@@ -130,7 +134,7 @@ export default function AdvisoryScreen() {
   }
 
   const fieldId = fieldIdFromAdvisoryId(a.advisory_id);
-  const heading = fieldId ? `Field ${fieldId}` : `Scan ${a.seq}`;
+  const heading = fieldId ? tr('Field {id}', { id: fieldId }) : tr('Scan {n}', { n: a.seq });
 
   return (
     <ScrollView
@@ -143,7 +147,7 @@ export default function AdvisoryScreen() {
       {/* When and where, as a person says it. The advisory id is for the pod
           log and lives under Scan details. */}
       <Text style={[type.valueSmall, { color: color.mutedForeground, marginBottom: space.md }]}>
-        {`${formatWhen(a.generated_at_utc)} · scan ${a.seq}`}
+        {`${formatWhen(a.generated_at_utc)} · ${tr('scan {n}', { n: a.seq })}`}
       </Text>
 
       {/* Everything that qualifies the record comes before the record. */}
@@ -172,7 +176,7 @@ export default function AdvisoryScreen() {
 
       {/* Weather-app style: one tile per reading, a big figure and a small
           graphic. A tap widens the tile and opens its full card. */}
-      <TileGrid eyebrow="Field readings" title="What else the pod measured">
+      <TileGrid eyebrow={tr('Field readings')} title={tr('What else the pod measured')}>
         <ThermalCard thermal={a.thermal} />
         <IrrigationCard irrigation={a.irrigation} />
         <VegetationCard vegetation={a.vegetation} />
@@ -181,7 +185,7 @@ export default function AdvisoryScreen() {
         <PestCard pest={a.pest} />
       </TileGrid>
 
-      <Group eyebrow="About this scan">
+      <Group eyebrow={tr('About this scan')}>
         <InputsCard inputs={a.inputs} thermalReason={a.thermal?.reason} />
         <ScanCard advisory={a} />
       </Group>

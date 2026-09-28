@@ -10,6 +10,8 @@ import { Pressable, Text } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 
 import { color, font, space, type } from '../../src/ui/theme.ts';
+import { useLanguage } from '../../src/i18n/language.tsx';
+import { tr } from '../../src/i18n/tr.ts';
 
 /**
  * A worded back button rather than a bare arrow: it is a larger target for a
@@ -22,7 +24,7 @@ function BackButton({ label }: { label: string }) {
     <Pressable
       onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
       accessibilityRole="button"
-      accessibilityLabel={`Back to ${label.toLowerCase()}`}
+      accessibilityLabel={tr('Back to {where}', { where: label })}
       hitSlop={12}
       style={({ pressed }) => ({
         flexDirection: 'row',
@@ -38,6 +40,7 @@ function BackButton({ label }: { label: string }) {
 }
 
 export default function ScansLayout() {
+  useLanguage();
   return (
     <Stack
       screenOptions={{
@@ -49,13 +52,16 @@ export default function ScansLayout() {
         headerTitleStyle: { fontFamily: font.sansBold, fontSize: 16.5 },
         contentStyle: { backgroundColor: color.background },
         headerBackVisible: false,
-        headerLeft: () => <BackButton label="Back" />,
+        headerLeft: () => <BackButton label={tr('Back')} />,
       }}
     >
       {/* The dashboard draws its own inverted header band. */}
       <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="all" options={{ title: 'All scans', headerLeft: () => <BackButton label="Home" /> }} />
-      <Stack.Screen name="advisory/[id]" options={{ title: 'Scan' }} />
+      <Stack.Screen
+        name="all"
+        options={{ title: tr('All scans'), headerLeft: () => <BackButton label={tr('Home')} /> }}
+      />
+      <Stack.Screen name="advisory/[id]" options={{ title: tr('Scan') }} />
     </Stack>
   );
 }

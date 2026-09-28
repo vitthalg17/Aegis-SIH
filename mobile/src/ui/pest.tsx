@@ -47,6 +47,7 @@ import { color, space, type } from './theme.ts';
 import type { PestFinding } from '../schema/advisory.ts';
 import { TRAP_COUNT_DISCLAIMER } from '../schema/advisory.ts';
 import { describeTaxon } from '../schema/classes.ts';
+import { msg, tr } from '../i18n/tr.ts';
 
 const PEST_TONE: Record<string, Tone> = {
   BELOW_ETL: 'good',
@@ -61,15 +62,15 @@ const PEST_TONE: Record<string, Tone> = {
 };
 
 const PEST_STATUS_LABEL: Record<string, string> = {
-  BELOW_ETL: 'BELOW THE LIMIT',
-  AT_ETL: 'AT THE LIMIT',
-  ABOVE_ETL: 'OVER THE LIMIT',
-  NO_PUBLISHED_ETL: 'NO PUBLISHED LIMIT',
-  NOT_SAMPLED_BY_STICKY_TRAP: 'WRONG INSTRUMENT',
-  UNKNOWN_PEST: 'PEST NOT RECOGNISED',
-  CARD_SATURATED: 'CARD TOO FULL TO COUNT',
-  INVALID_MONITORING_WINDOW: 'BAD MONITORING WINDOW',
-  MISSING_DEPLOYMENT_TIMESTAMP: 'NO START DATE',
+  BELOW_ETL: msg('BELOW THE LIMIT'),
+  AT_ETL: msg('AT THE LIMIT'),
+  ABOVE_ETL: msg('OVER THE LIMIT'),
+  NO_PUBLISHED_ETL: msg('NO PUBLISHED LIMIT'),
+  NOT_SAMPLED_BY_STICKY_TRAP: msg('WRONG INSTRUMENT'),
+  UNKNOWN_PEST: msg('PEST NOT RECOGNISED'),
+  CARD_SATURATED: msg('CARD TOO FULL TO COUNT'),
+  INVALID_MONITORING_WINDOW: msg('BAD MONITORING WINDOW'),
+  MISSING_DEPLOYMENT_TIMESTAMP: msg('NO START DATE'),
 };
 
 /**
@@ -81,25 +82,25 @@ const PEST_STATUS_LABEL: Record<string, string> = {
  */
 const PEST_STATUS_BODY: Record<string, string> = {
   NOT_SAMPLED_BY_STICKY_TRAP:
-    'A yellow sticky card is not how this pest is monitored, so no count is given for it. A count here would be a meaningless number rather than a low one. Stem borers are monitored on pheromone lure traps; planthoppers are counted by tapping the base of a hill over a tray. Ask your extension officer which applies to this one.',
+    msg('A yellow sticky card is not how this pest is monitored, so no count is given for it. A count here would be a meaningless number rather than a low one. Stem borers are monitored on pheromone lure traps; planthoppers are counted by tapping the base of a hill over a tray. Ask your extension officer which applies to this one.'),
   NO_PUBLISHED_ETL:
-    'The published guidance gives no action threshold for this pest, so there is nothing to compare the count against. That is the source being honest rather than a missing feature. Treat the count as something to watch over time, not as a trigger.',
+    msg('The published guidance gives no action threshold for this pest, so there is nothing to compare the count against. That is the source being honest rather than a missing feature. Treat the count as something to watch over time, not as a trigger.'),
   UNKNOWN_PEST:
-    'The system does not have an entry for this pest, so it cannot say what a normal count looks like.',
+    msg('The system does not have an entry for this pest, so it cannot say what a normal count looks like.'),
   CARD_SATURATED:
-    'The card is too crowded for the segmenter to separate individual insects, so the count would be an undercount. Replace the card and start a fresh monitoring window.',
+    msg('The card is too crowded for the segmenter to separate individual insects, so the count would be an undercount. Replace the card and start a fresh monitoring window.'),
   INVALID_MONITORING_WINDOW:
-    'The card has been out for either less than a day or more than a week, and the published threshold assumes something in between. No comparison was made.',
+    msg('The card has been out for either less than a day or more than a week, and the published threshold assumes something in between. No comparison was made.'),
   MISSING_DEPLOYMENT_TIMESTAMP:
-    'Nobody recorded when this card was put out, so there is no monitoring window to divide by and no comparison to make.',
+    msg('Nobody recorded when this card was put out, so there is no monitoring window to divide by and no comparison to make.'),
 };
 
 /** The Model B morphological classes, in the words the registry uses. */
 const MORPH_LABEL: Record<string, string> = {
-  small_pale_winged: 'small pale winged',
-  larger_insect: 'larger insects',
-  debris: 'debris',
-  UNCERTAIN_NON_TARGET: 'could not classify',
+  small_pale_winged: msg('small pale winged'),
+  larger_insect: msg('larger insects'),
+  debris: msg('debris'),
+  UNCERTAIN_NON_TARGET: msg('could not classify'),
 };
 
 const MORPH_TONE: Record<string, Tone> = {
@@ -123,7 +124,7 @@ function PestRow({ pest, index }: { pest: PestFinding; index: number }) {
         .filter(([, f]) => typeof f === 'number' && f > 0)
         .map(([k, f]) => ({
           count: Math.round(f * total),
-          label: MORPH_LABEL[k] ?? k.replace(/_/g, ' '),
+          label: MORPH_LABEL[k] ? tr(MORPH_LABEL[k]) : k.replace(/_/g, ' '),
           tone: MORPH_TONE[k] ?? 'neutral',
         }))
     : [];
@@ -135,14 +136,16 @@ function PestRow({ pest, index }: { pest: PestFinding; index: number }) {
         <Text style={[type.cardTitle, { color: color.foreground, flex: 1 }]}>
           {describeTaxon(pest.target_pest_context)}
         </Text>
-        <StatusChip label={PEST_STATUS_LABEL[status] ?? status.replace(/_/g, ' ')} tone={tone} />
+        <StatusChip label={PEST_STATUS_LABEL[status] ? tr(PEST_STATUS_LABEL[status]) : status.replace(/_/g, ' ')} tone={tone} />
       </View>
 
       {/* The wrong-instrument case, and its siblings, are advice rather than
           gaps. Lead with what to do instead; the absent count is the footnote. */}
       {!comparable ? (
-        <Panel label={PEST_STATUS_LABEL[status] ?? 'Not comparable'} tone={tone}>
-          {PEST_STATUS_BODY[status] ?? 'No comparison could be made against a published limit.'}
+        <Panel label={PEST_STATUS_LABEL[status] ? tr(PEST_STATUS_LABEL[status]) : tr('Not comparable')} tone={tone}>
+          {PEST_STATUS_BODY[status]
+            ? tr(PEST_STATUS_BODY[status])
+            : tr('No comparison could be made against a published limit.')}
         </Panel>
       ) : null}
 
@@ -151,12 +154,12 @@ function PestRow({ pest, index }: { pest: PestFinding; index: number }) {
         <>
           <View style={s.head}>
             <View style={{ flex: 1 }}>
-              <Text style={[type.chipLabel, { color: color.fgSubtle }]}>CAUGHT ON THE CARD</Text>
+              <Text style={[type.chipLabel, { color: color.fgSubtle }]}>{tr('CAUGHT ON THE CARD')}</Text>
               <View style={s.inlineValue}>
                 <Text style={[type.stat, { color: color.foreground }]}>{pest.count_observed}</Text>
                 {typeof threshold === 'number' ? (
                   <Text style={[type.chipValue, { color: color.fgSubtle }]}>
-                    of {threshold} {String(pest.threshold_unit ?? '').replace(/_/g, ' ')}
+                    {tr('of {n}', { n: threshold })} {String(pest.threshold_unit ?? '').replace(/_/g, ' ')}
                   </Text>
                 ) : null}
               </View>
@@ -170,16 +173,16 @@ function PestRow({ pest, index }: { pest: PestFinding; index: number }) {
               max={threshold * 1.5}
               tone={tone}
               bands={[
-                { upTo: threshold, label: 'below', tone: 'good' },
-                { upTo: threshold * 1.5, label: 'over', tone: 'bad' },
+                { upTo: threshold, label: tr('below'), tone: 'good' },
+                { upTo: threshold * 1.5, label: tr('over'), tone: 'bad' },
               ]}
-              markerLabel={`act at ${threshold}`}
+              markerLabel={tr('act at {n}', { n: threshold })}
               caption={
                 status === 'ABOVE_ETL'
-                  ? 'Past the published point at which the guidance says to intervene.'
+                  ? tr('Past the published point at which the guidance says to intervene.')
                   : status === 'AT_ETL'
-                    ? 'Exactly at the published intervention point.'
-                    : 'Under the published intervention point.'
+                    ? tr('Exactly at the published intervention point.')
+                    : tr('Under the published intervention point.')
               }
             />
           ) : null}
@@ -187,17 +190,17 @@ function PestRow({ pest, index }: { pest: PestFinding; index: number }) {
           {/* Rule: the count is a deliberate over-estimate, and saying so is
               not optional — an over-estimate that reads as a species count
               pushes toward spraying. */}
-          <Panel label="What that number counts" tone="warn">
-            {TRAP_COUNT_DISCLAIMER}
+          <Panel label={tr('What that number counts')} tone="warn">
+            {tr(TRAP_COUNT_DISCLAIMER)}
           </Panel>
 
           <ChipRow>
-            <Chip label="DAYS OUT" value={String(pest.days_monitored)} />
-            <Chip label="PER DAY" value={String(pest.daily_rate)} />
+            <Chip label={tr('DAYS OUT')} value={String(pest.days_monitored)} />
+            <Chip label={tr('PER DAY')} value={String(pest.daily_rate)} />
             <Chip
-              label="COUNTED BY"
+              label={tr('COUNTED BY')}
               value={
-                pest.count_basis === 'watershed_all_blobs' ? 'SHAPE SEGMENTER' : String(pest.count_basis)
+                pest.count_basis === 'watershed_all_blobs' ? tr('SHAPE SEGMENTER') : String(pest.count_basis)
               }
             />
           </ChipRow>
@@ -208,8 +211,7 @@ function PestRow({ pest, index }: { pest: PestFinding; index: number }) {
               a reader who compares the daily figure against it will act late. */}
           {comparable ? (
             <Text style={[type.small, { color: color.mutedForeground, marginTop: space.sm }]}>
-              The limit is counted across the whole time the card has been out, not per
-              day. The per-day figure is there to show whether numbers are climbing.
+              {tr('The limit is counted across the whole time the card has been out, not per day. The per-day figure is there to show whether numbers are climbing.')}
             </Text>
           ) : null}
         </>
@@ -219,13 +221,10 @@ function PestRow({ pest, index }: { pest: PestFinding; index: number }) {
           explicitly unverified against Indian field conditions. */}
       {morphSegments.length > 0 ? (
         <View style={{ marginTop: space.md }}>
-          <Text style={[type.chipLabel, { color: color.fgSubtle }]}>WHAT THE SHAPES LOOKED LIKE</Text>
+          <Text style={[type.chipLabel, { color: color.fgSubtle }]}>{tr('WHAT THE SHAPES LOOKED LIKE')}</Text>
           <EvidenceBar segments={morphSegments} />
-          <Panel label="A guess, not an identification" tone="unknown">
-            This breakdown comes from a model trained on traps in Europe and never checked
-            against Indian field conditions. &quot;Small pale winged&quot; does not
-            distinguish whitefly from thrips or aphids. It does not affect the count above
-            or the comparison against the limit. Those come from the shape segmenter.
+          <Panel label={tr('A guess, not an identification')} tone="unknown">
+            {tr('This breakdown comes from a model trained on traps in Europe and never checked against Indian field conditions. "Small pale winged" does not distinguish whitefly from thrips or aphids. It does not affect the count above or the comparison against the limit. Those come from the shape segmenter.')}
           </Panel>
         </View>
       ) : null}
@@ -250,21 +249,20 @@ export function PestCard({ pest }: { pest: PestFinding[] }) {
   if (findings.length === 0) {
     return (
       <Card
-        eyebrow="Pest"
-        title="Sticky trap"
-        summary="No trap card photographed"
+        eyebrow={tr('Pest')}
+        title={tr('Sticky trap')}
+        summary={tr('No trap card photographed')}
         summaryTone="unknown"
         tile={{
           icon: <BugIcon color={color.unknown} />,
-          label: 'STICKY TRAP',
-          value: 'No card',
+          label: tr('STICKY TRAP'),
+          value: tr('No card'),
           muted: true,
-          caption: 'No trap card photographed',
+          caption: tr('No trap card photographed'),
         }}
       >
         <Muted>
-          No trap count in this advisory. A card has to be photographed and sent to the pod
-          before there is anything to count. Nothing is assumed in the meantime.
+          {tr('No trap count in this advisory. A card has to be photographed and sent to the pod before there is anything to count. Nothing is assumed in the meantime.')}
         </Muted>
       </Card>
     );
@@ -278,7 +276,9 @@ export function PestCard({ pest }: { pest: PestFinding[] }) {
     .map(
       (p) =>
         `${describeTaxon(p.target_pest_context)}: ${(
-          PEST_STATUS_LABEL[String(p.status)] ?? String(p.status).replace(/_/g, ' ')
+          PEST_STATUS_LABEL[String(p.status)]
+            ? tr(PEST_STATUS_LABEL[String(p.status)])
+            : String(p.status).replace(/_/g, ' ')
         ).toLowerCase()}`,
     )
     .join(' · ');
@@ -291,30 +291,31 @@ export function PestCard({ pest }: { pest: PestFinding[] }) {
 
   return (
     <Card
-      eyebrow="Pest"
-      title="Sticky trap"
+      eyebrow={tr('Pest')}
+      title={tr('Sticky trap')}
       summary={summary}
       summaryTone={worst ? (PEST_TONE[String(worst.status)] ?? 'warn') : 'neutral'}
       tile={{
         icon: <BugIcon color={TONE[tileTone].fg} />,
-        label: 'STICKY TRAP',
-        value: over.length > 0 ? `${over.length} over` : 'Below',
-        unit: over.length > 0 ? 'the limit' : 'the limits',
+        label: tr('STICKY TRAP'),
+        value: over.length > 0 ? tr('{n} over', { n: over.length }) : tr('Below'),
+        unit: over.length > 0 ? tr('the limit') : tr('the limits'),
         tone: tileTone,
         visual: <Dots tones={findings.map((p) => PEST_TONE[String(p.status)] ?? 'unknown')} />,
         caption:
           over.length > 0
             ? over.map((p) => describeTaxon(p.target_pest_context)).join(', ')
-            : `${findings.length} pest${findings.length === 1 ? '' : 's'} checked`,
+            : findings.length === 1
+              ? tr('1 pest checked')
+              : tr('{n} pests checked', { n: findings.length }),
       }}
     >
       {findings.map((p, i) => (
         <PestRow key={`${p.target_pest_context}-${i}`} pest={p} index={i} />
       ))}
 
-      <Panel label="Scale" tone="neutral">
-        Published guidance assumes four to five traps per acre. This system has one, which
-        samples a spot rather than a field.
+      <Panel label={tr('Scale')} tone="neutral">
+        {tr('Published guidance assumes four to five traps per acre. This system has one, which samples a spot rather than a field.')}
       </Panel>
     </Card>
   );
@@ -343,38 +344,37 @@ export function TrapUploadResultCard({
   const tone = PEST_TONE[result.etl_status] ?? 'unknown';
 
   return (
-    <Card eyebrow="Trap card" title={`Card ${result.trap_id}`}>
+    <Card eyebrow={tr('Trap card')} title={tr('Card {id}', { id: result.trap_id })}>
       <View style={s.statRow}>
-        <Stat value={String(result.total_blobs_counted)} caption="Shapes found on the card" />
+        <Stat value={String(result.total_blobs_counted)} caption={tr('Shapes found on the card')} />
         <Stat
-          value={PEST_STATUS_LABEL[result.etl_status] ?? result.etl_status.replace(/_/g, ' ')}
-          caption="Against the published limit"
+          value={PEST_STATUS_LABEL[result.etl_status] ? tr(PEST_STATUS_LABEL[result.etl_status]) : result.etl_status.replace(/_/g, ' ')}
+          caption={tr('Against the published limit')}
           tone={tone}
         />
       </View>
 
       {provisional ? (
-        <Panel label="Scale not measured" tone="warn">
-          {`The pod could not work out how many millimetres a pixel covers (${result.scale_status.toLowerCase()}), so it cannot tell a large insect from a small one by size. The total count is still the total count, but anything that depends on insect size is guesswork. Photograph the card flat, with its printed scale marker in frame, to fix this.`}
+        <Panel label={tr('Scale not measured')} tone="warn">
+          {tr('The pod could not work out how many millimetres a pixel covers ({s}), so it cannot tell a large insect from a small one by size. The total count is still the total count, but anything that depends on insect size is guesswork. Photograph the card flat, with its printed scale marker in frame, to fix this.', { s: result.scale_status.toLowerCase() })}
         </Panel>
       ) : (
-        <Panel label="Scale measured" tone="good">
-          {`Scale read from the card at ${result.scale_mm_per_pixel} mm per pixel, so size-based sorting is meaningful.`}
+        <Panel label={tr('Scale measured')} tone="good">
+          {tr('Scale read from the card at {v} mm per pixel, so size-based sorting is meaningful.', { v: result.scale_mm_per_pixel ?? '?' })}
         </Panel>
       )}
 
-      <Panel label="What that number counts" tone="warn">
-        {TRAP_COUNT_DISCLAIMER}
+      <Panel label={tr('What that number counts')} tone="warn">
+        {tr(TRAP_COUNT_DISCLAIMER)}
       </Panel>
 
       {result.advisory_id ? (
         <Text style={[type.valueSmall, { color: color.fgSubtle, marginTop: space.sm }]}>
-          {`Folded into advisory ${result.advisory_id}. Pull from the pod to see it.`}
+          {tr('Folded into advisory {id}. Pull from the pod to see it.', { id: result.advisory_id })}
         </Text>
       ) : (
         <Muted>
-          The pod stored the count but did not build a new advisory from it. It will appear
-          in the next scan&apos;s advisory.
+          {tr("The pod stored the count but did not build a new advisory from it. It will appear in the next scan's advisory.")}
         </Muted>
       )}
     </Card>

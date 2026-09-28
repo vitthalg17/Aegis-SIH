@@ -16,6 +16,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getState } from '../db/client.ts';
 import { syncNow } from './client.ts';
 import type { SyncOutcome, SyncProgress } from './client.ts';
+import { tr } from '../i18n/tr.ts';
 
 export type ConnectionState = 'never_synced' | 'idle' | 'syncing' | 'failed';
 
@@ -78,14 +79,15 @@ export function useSync() {
  * this app cannot verify would be its own small fabrication.
  */
 export function describeAge(iso: string | null, now: Date = new Date()): string {
-  if (!iso) return 'never';
+  // Display text only, in the app's language; the arithmetic is unchanged.
+  if (!iso) return tr('never');
   const then = Date.parse(iso);
-  if (Number.isNaN(then)) return 'unknown';
+  if (Number.isNaN(then)) return tr('unknown');
   const mins = Math.floor((now.getTime() - then) / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins} min ago`;
+  if (mins < 1) return tr('just now');
+  if (mins < 60) return tr('{n} min ago', { n: mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} h ago`;
+  if (hours < 24) return tr('{n} h ago', { n: hours });
   const days = Math.floor(hours / 24);
-  return days === 1 ? 'yesterday' : `${days} days ago`;
+  return days === 1 ? tr('yesterday') : tr('{n} days ago', { n: days });
 }

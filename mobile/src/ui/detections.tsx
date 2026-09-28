@@ -46,6 +46,7 @@ import {
   toUnitSquare,
 } from './field-geometry.ts';
 import { color, space, type } from './theme.ts';
+import { dateLocale, msg, tr } from '../i18n/tr.ts';
 import type { Advisory, CrossSourceReliability, Detection } from '../schema/advisory.ts';
 import { describeClass } from '../schema/classes.ts';
 import {
@@ -74,10 +75,10 @@ const TIER_TONE: Record<string, Tone> = {
  * being asked. The full tier sentence is one tap down, in the row's detail.
  */
 const TRUST_LABEL: Record<string, string> = {
-  TESTED_ROBUST: 'USUALLY RIGHT',
-  TESTED_WEAK: 'OFTEN WRONG',
-  TESTED_FAILED: 'RARELY RIGHT',
-  UNTESTED: 'UNTESTED',
+  TESTED_ROBUST: msg('USUALLY RIGHT'),
+  TESTED_WEAK: msg('OFTEN WRONG'),
+  TESTED_FAILED: msg('RARELY RIGHT'),
+  UNTESTED: msg('UNTESTED'),
 };
 
 /** How many findings show before "Show more". */
@@ -113,10 +114,9 @@ export function DiseaseCard({ advisory }: { advisory: Advisory }) {
 
   if (disease.length === 0) {
     return (
-      <Card title="What the camera found">
+      <Card title={tr('What the camera found')}>
         <Muted>
-          Nothing was flagged in this scan. See the verdict above for what that means. An
-          empty list here is not the same as a clean bill of health.
+          {tr('Nothing was flagged in this scan. See the verdict above for what that means. An empty list here is not the same as a clean bill of health.')}
         </Muted>
       </Card>
     );
@@ -154,12 +154,12 @@ export function DiseaseCard({ advisory }: { advisory: Advisory }) {
 
   return (
     <Card
-      title="What the camera found"
+      title={tr('What the camera found')}
       right={<Text style={[type.chipValue, { color: color.fgSubtle }]}>{findings.length}</Text>}
     >
       {/* One standing line for the whole card, above every row. */}
       <Text style={[type.small, { color: color.warningForeground, marginBottom: space.xs }]}>
-        Check every finding by eye before treating. Tap one for the details.
+        {tr('Check every finding by eye before treating. Tap one for the details.')}
       </Text>
 
       {shown.map((f, i) => (
@@ -173,7 +173,7 @@ export function DiseaseCard({ advisory }: { advisory: Advisory }) {
           style={({ pressed }) => [s.more, pressed && { opacity: 0.6 }]}
         >
           <Text style={[type.label, { color: color.primary }]}>
-            {showAll ? 'Show fewer' : `Show ${hidden} more`}
+            {showAll ? tr('Show fewer') : tr('Show {n} more', { n: hidden })}
           </Text>
         </Pressable>
       ) : null}
@@ -182,10 +182,10 @@ export function DiseaseCard({ advisory }: { advisory: Advisory }) {
           Every confidence figure on this card sits inside a row's detail,
           below this. */}
       <Text style={[type.small, { color: color.fgSubtle, marginTop: space.sm }]}>
-        {CONFIDENCE_CAVEAT}
+        {tr(CONFIDENCE_CAVEAT)}
         {/* Contract: media_ids is always present and always empty, because the
             pod prunes images to save storage. Said once, not per row. */}
-        {photosPruned ? ' Photos are not kept on the pod.' : ''}
+        {photosPruned ? ` ${tr('Photos are not kept on the pod.')}` : ''}
       </Text>
     </Card>
   );
@@ -196,7 +196,8 @@ function FindingRow({ finding: f, strongest }: { finding: Finding; strongest: bo
   const described = describeClass(f.className);
   const info = describeReliability(f.tier);
   const tone = f.tier ? (TIER_TONE[String(f.tier)] ?? 'bad') : 'bad';
-  const trust = f.tier ? (TRUST_LABEL[String(f.tier)] ?? info.label) : 'NO TRUST DATA';
+  const trustKey = f.tier ? TRUST_LABEL[String(f.tier)] : undefined;
+  const trust = trustKey ? tr(trustKey) : f.tier ? info.label : tr('NO TRUST DATA');
   const recall = recallPercent(f.className);
 
   return (
@@ -214,8 +215,8 @@ function FindingRow({ finding: f, strongest }: { finding: Finding; strongest: bo
           <Text style={[type.small, { color: color.mutedForeground, marginTop: 2 }]}>
             {[
               described.crop ?? f.className,
-              `${f.frames} frame${f.frames === 1 ? '' : 's'}`,
-              strongest ? 'strongest' : null,
+              f.frames === 1 ? tr('1 frame') : tr('{n} frames', { n: f.frames }),
+              strongest ? tr('strongest') : null,
             ]
               .filter(Boolean)
               .join(' · ')}
@@ -231,7 +232,9 @@ function FindingRow({ finding: f, strongest }: { finding: Finding; strongest: bo
           folded or not. */}
       {f.tier === 'TESTED_FAILED' && !open ? (
         <Text style={[type.small, { color: color.destructive, marginTop: -2, marginBottom: space.sm }]}>
-          {`Right ${recall ?? 'almost none'} of the time in tests on new cameras. A prompt to look, not a diagnosis.`}
+          {recall
+            ? tr('Right {pct} of the time in tests on new cameras. A prompt to look, not a diagnosis.', { pct: recall })
+            : tr('Almost never right in tests on new cameras. A prompt to look, not a diagnosis.')}
         </Text>
       ) : null}
 
@@ -239,25 +242,25 @@ function FindingRow({ finding: f, strongest }: { finding: Finding; strongest: bo
         <View style={{ paddingBottom: space.md }}>
           {/* Tier first, deliberately. It decides what the confidence under it
               is worth. */}
-          <Panel label="How much to trust this" tone={tone}>
+          <Panel label={tr('How much to trust this')} tone={tone}>
             {info.body}
             {recall
-              ? ` On the independent test set this class was recognised correctly ${recall} of the time.`
+              ? ` ${tr('On the independent test set this class was recognised correctly {pct} of the time.', { pct: recall })}`
               : ''}
           </Panel>
 
           <View style={s.statRow}>
             <Stat
               value={String(f.frames)}
-              caption={f.frames === 1 ? 'Frame it appeared in' : 'Frames it appeared in'}
+              caption={f.frames === 1 ? tr('Frame it appeared in') : tr('Frames it appeared in')}
               tone={f.frames > 2 ? 'bad' : 'neutral'}
             />
-            <Stat value={f.confidence.toFixed(2)} caption="Model certainty" />
+            <Stat value={f.confidence.toFixed(2)} caption={tr('Model certainty')} />
             {/* "?" rather than "untested" in a third-width column, where the
                 word was cut to "untes…"; the caption carries the meaning. */}
             <Stat
               value={recall ?? '?'}
-              caption={recall ? 'Right on new cameras' : 'Never tested on new cameras'}
+              caption={recall ? tr('Right on new cameras') : tr('Never tested on new cameras')}
               tone={recall ? 'warn' : 'unknown'}
             />
           </View>
@@ -267,8 +270,7 @@ function FindingRow({ finding: f, strongest }: { finding: Finding; strongest: bo
               infer it from a count of one. */}
           {f.frames === 1 ? (
             <Text style={[type.small, { color: color.mutedForeground, marginTop: space.sm }]}>
-              Seen in a single frame. A real lesion usually shows up in several as you walk
-              past it, so this one is worth a second look.
+              {tr('Seen in a single frame. A real lesion usually shows up in several as you walk past it, so this one is worth a second look.')}
             </Text>
           ) : null}
 
@@ -290,10 +292,16 @@ function FindingRow({ finding: f, strongest }: { finding: Finding; strongest: bo
  */
 const SPREAD_COPY: Record<string, (m: number) => string> = {
   Clustered: (m) =>
-    `The findings sit close together, about ${m} m apart on average. Start where they are densest.`,
-  'Loosely grouped': (m) => `The findings are somewhat grouped, about ${m} m apart on average.`,
+    tr('The findings sit close together, about {m} m apart on average. Start where they are densest.', { m }),
+  'Loosely grouped': (m) => tr('The findings are somewhat grouped, about {m} m apart on average.', { m }),
   'Spread out': (m) =>
-    `The findings are scattered across the area you scanned, roughly ${m} m apart on average, rather than concentrated in one place.`,
+    tr('The findings are scattered across the area you scanned, roughly {m} m apart on average, rather than concentrated in one place.', { m }),
+};
+
+const SPREAD_LABEL: Record<string, string> = {
+  Clustered: msg('Clustered'),
+  'Loosely grouped': msg('Loosely grouped'),
+  'Spread out': msg('Spread out'),
 };
 
 export function DetectionsCard({ advisory }: { advisory: Advisory }) {
@@ -304,11 +312,11 @@ export function DetectionsCard({ advisory }: { advisory: Advisory }) {
 
   if (detections.length === 0) {
     return (
-      <Card eyebrow="Where" title="Where in the field" summary="Nothing to place on a map">
+      <Card eyebrow={tr('Where')} title={tr('Where in the field')} summary={tr('Nothing to place on a map')}>
         <Muted>
           {gps?.status === 'ABSENT'
-            ? 'No satellite fix during this scan, and nothing was flagged to place on a map.'
-            : 'Nothing was flagged in this scan, so there is nothing to place on a map.'}
+            ? tr('No satellite fix during this scan, and nothing was flagged to place on a map.')
+            : tr('Nothing was flagged in this scan, so there is nothing to place on a map.')}
         </Muted>
       </Card>
     );
@@ -317,20 +325,22 @@ export function DetectionsCard({ advisory }: { advisory: Advisory }) {
   if (located.length === 0) {
     return (
       <Card
-        eyebrow="Where"
-        title="Where in the field"
-        summary={`No GPS positions for ${detections.length} finding${detections.length === 1 ? '' : 's'}`}
+        eyebrow={tr('Where')}
+        title={tr('Where in the field')}
+        summary={
+          detections.length === 1
+            ? tr('No GPS position for 1 finding')
+            : tr('No GPS positions for {n} findings', { n: detections.length })
+        }
         summaryTone="unknown"
       >
-        <Panel label="No positions" tone="unknown">
-          {detections.length} detection{detections.length === 1 ? '' : 's'} were made but none
-          could be positioned
-          {gps?.status === 'ABSENT' ? ' because the pod never got a satellite fix' : ''}. The findings
-          are still real; only their locations are missing.
+        <Panel label={tr('No positions')} tone="unknown">
+          {gps?.status === 'ABSENT'
+            ? tr('{n} findings were made but none could be positioned because the pod never got a satellite fix. The findings are still real; only their locations are missing.', { n: detections.length })
+            : tr('{n} findings were made but none could be positioned. The findings are still real; only their locations are missing.', { n: detections.length })}
         </Panel>
         <Muted>
-          Leaving the pod in open sky for a minute before a scan usually gets a fix. Without
-          one, you get the findings but not a map of where they are.
+          {tr('Leaving the pod in open sky for a minute before a scan usually gets a fix. Without one, you get the findings but not a map of where they are.')}
         </Muted>
       </Card>
     );
@@ -378,23 +388,23 @@ export function DetectionsCard({ advisory }: { advisory: Advisory }) {
     lon: d.lon,
     tone: toneOf(d.class),
     label: describeClass(d.class).condition,
-    sub: `${describeClass(d.class).crop ?? ''}${d.captured_utc ? ` · ${new Date(d.captured_utc).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}` : ''}`,
+    sub: `${describeClass(d.class).crop ?? ''}${d.captured_utc ? ` · ${new Date(d.captured_utc).toLocaleTimeString(dateLocale(), { hour: 'numeric', minute: '2-digit' })}` : ''}`,
   }));
 
   const gpsLine = [
-    gps?.point_count !== undefined ? `${gps.point_count} GPS fixes` : null,
-    dgps > 0 ? `${dgps} of ${fixes.length} differential` : null,
-    worstHdop !== null ? `worst spread ${worstHdop.toFixed(1)}` : null,
+    gps?.point_count !== undefined ? tr('{n} GPS fixes', { n: gps.point_count }) : null,
+    dgps > 0 ? tr('{a} of {b} differential', { a: dgps, b: fixes.length }) : null,
+    worstHdop !== null ? tr('worst spread {v}', { v: worstHdop.toFixed(1) }) : null,
   ]
     .filter(Boolean)
     .join(' · ');
 
   return (
-    <Card eyebrow="Where" title="Where in the field">
+    <Card eyebrow={tr('Where')} title={tr('Where in the field')}>
       {/* The reading, in words, above the map. */}
       {spread ? (
         <View style={s.verdictRow}>
-          <Text style={[type.label, { color: color.foreground }]}>{spread.verdict}</Text>
+          <Text style={[type.label, { color: color.foreground }]}>{tr(SPREAD_LABEL[spread.verdict] ?? spread.verdict)}</Text>
           <Text style={[type.small, { color: color.mutedForeground, marginTop: 2 }]}>
             {SPREAD_COPY[spread.verdict](Math.round(spread.meanSeparationM))}
           </Text>
@@ -418,20 +428,22 @@ export function DetectionsCard({ advisory }: { advisory: Advisory }) {
 
       {/* The caveat is the point. Without it the map over-promises. */}
       <Text style={[type.small, { color: color.warningForeground, marginTop: space.sm }]}>
-        {`Each circle is about ${FIX_RADIUS_M} m across the GPS error, so it marks a patch of the field, not one plant. Use it to find the area, then look around it.`}
+        {tr('Each circle is about {m} m across the GPS error, so it marks a patch of the field, not one plant. Use it to find the area, then look around it.', { m: FIX_RADIUS_M })}
       </Text>
 
       {/* A map is persuasive in a way a list is not, so the reliability of what
           is on it travels with it rather than living only on the card above. */}
       {worstTier.severity >= 2 ? (
-        <Panel label="How much to trust the marks" tone={TIER_TONE[String(worstTier.tier)] ?? 'bad'}>
+        <Panel label={tr('How much to trust the marks')} tone={TIER_TONE[String(worstTier.tier)] ?? 'bad'}>
           {worstTier.body}
         </Panel>
       ) : null}
 
       {unlocated > 0 ? (
         <Text style={[type.small, { color: color.unknown, marginTop: space.sm }]}>
-          {`${unlocated} more finding${unlocated === 1 ? ' has' : 's have'} no position and ${unlocated === 1 ? 'is' : 'are'} not on the map. The finding is real even where the position is not.`}
+          {unlocated === 1
+            ? tr('1 more finding has no position and is not on the map. The finding is real even where the position is not.')
+            : tr('{n} more findings have no position and are not on the map. The finding is real even where the position is not.', { n: unlocated })}
         </Text>
       ) : null}
 

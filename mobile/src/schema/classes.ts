@@ -16,6 +16,8 @@
  * Splitting on a single underscore gives the wrong crop, silently.
  */
 
+import { msg, tr } from '../i18n/tr.ts';
+
 export type ClassCategory = 'healthy' | 'disease' | 'pest_damage' | 'reject';
 
 export type ClassInfo = {
@@ -113,10 +115,15 @@ export const DRIED_LEAF_CAVEAT =
 export function describeClass(raw: string): ClassInfo & { known: boolean; label: string } {
   const known = CLASS_INFO[raw];
   if (known) {
+    // Names are translated here, at the one place every screen gets them.
+    const crop = known.crop ? tr(known.crop) : null;
+    const condition = tr(known.condition);
     return {
       ...known,
+      crop,
+      condition,
       known: true,
-      label: known.crop ? `${known.crop} · ${known.condition}` : known.condition,
+      label: crop ? `${crop} · ${condition}` : condition,
     };
   }
   return {
@@ -128,8 +135,24 @@ export function describeClass(raw: string): ClassInfo & { known: boolean; label:
   };
 }
 
-/** Taxon strings from the pest registry, opened out for display. */
+/** Display names for the pest taxa the trap reports. */
+const TAXON_NAMES: Record<string, string> = {
+  sugarcane_whitefly_woolly_aphid: msg('Sugarcane whitefly and woolly aphid'),
+  yellow_stem_borer: msg('Yellow stem borer'),
+  thrips: msg('Thrips'),
+  aphid: msg('Aphid'),
+  whitefly: msg('Whitefly'),
+  brown_planthopper: msg('Brown planthopper'),
+  leaf_roller: msg('Leaf roller'),
+  hispa: msg('Hispa'),
+};
+
+/**
+ * Taxon strings from the pest registry, opened out for display. A taxon this
+ * table does not name keeps its registry spelling rather than a guessed name.
+ */
 export function describeTaxon(raw: string): string {
+  if (TAXON_NAMES[raw]) return tr(TAXON_NAMES[raw]);
   const s = raw.replace(/_/g, ' ');
   return s.charAt(0).toUpperCase() + s.slice(1);
 }

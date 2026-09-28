@@ -58,6 +58,15 @@ import {
 } from '../src/ui/components.tsx';
 import { useStatusBarStyle } from '../src/ui/status-bar.ts';
 import { color, radius, space, type } from '../src/ui/theme.ts';
+import { useLanguage } from '../src/i18n/language.tsx';
+import { msg, tr } from '../src/i18n/tr.ts';
+
+const STATE_LABEL: Record<string, string> = {
+  never_synced: msg('NEVER SYNCED'),
+  idle: msg('SYNCED'),
+  syncing: msg('SYNCING'),
+  failed: msg('SYNC FAILED'),
+};
 
 export default function SyncScreen() {
   const { state, lastSyncUtc, error, progress, lastOutcome, run, refresh } = useSync();
@@ -75,6 +84,7 @@ export default function SyncScreen() {
   const [importNote, setImportNote] = useState<{ text: string; bad: boolean } | null>(null);
   const insets = useSafeAreaInsets();
   useStatusBarStyle('dark');
+  useLanguage();
 
   useEffect(() => {
     void getBaseUrl().then(setUrl);
@@ -124,15 +134,15 @@ export default function SyncScreen() {
       contentContainerStyle={{ padding: space.lg, paddingBottom: insets.bottom + space.xl }}
     >
       <View style={s.statRow}>
-        <StatCard value={String(count)} caption="Advisories held on this phone" highlight />
-        <StatCard value={describeAge(lastSyncUtc)} caption="Last successful pull" />
+        <StatCard value={String(count)} caption={tr('Advisories held on this phone')} highlight />
+        <StatCard value={describeAge(lastSyncUtc)} caption={tr('Last successful pull')} />
       </View>
 
-      <Card eyebrow="Connection" title="State">
+      <Card eyebrow={tr('Connection')} title={tr('State')}>
         <Row>
-          <Muted>Right now</Muted>
+          <Muted>{tr('Right now')}</Muted>
           <StatusChip
-            label={state.replace('_', ' ').toUpperCase()}
+            label={STATE_LABEL[state] ? tr(STATE_LABEL[state]) : state.replace('_', ' ').toUpperCase()}
             tone={state === 'idle' ? 'good' : state === 'failed' ? 'bad' : 'unknown'}
           />
         </Row>
@@ -143,14 +153,14 @@ export default function SyncScreen() {
             <Row>
               <Muted>{progress.phase}</Muted>
               <Text style={[type.chipValue, { color: color.foreground }]}>
-                {progress.total > 0 ? `${progress.fetched} / ${progress.total}` : 'starting'}
+                {progress.total > 0 ? `${progress.fetched} / ${progress.total}` : tr('starting')}
               </Text>
             </Row>
           </>
         ) : null}
 
         {error ? (
-          <Panel label="Why it failed" tone="bad">
+          <Panel label={tr('Why it failed')} tone="bad">
             {error}
           </Panel>
         ) : null}
@@ -160,11 +170,8 @@ export default function SyncScreen() {
             phone had been tracking is gone, and the phone may now be the only
             place some of those earlier scans still exist. */}
         {lastOutcome?.podReset ? (
-          <Panel label="The pod had been reset" tone="warn">
-            The pod&apos;s stored scans had been cleared since this phone last spoke to
-            it, so its numbering had started again from the beginning. Everything was
-            re-collected from scratch. Nothing on this phone was deleted. Any scan the
-            pod no longer has is still here, and this phone may now be the only copy.
+          <Panel label={tr('The pod had been reset')} tone="warn">
+            {tr("The pod's stored scans had been cleared since this phone last spoke to it, so its numbering had started again from the beginning. Everything was re-collected from scratch. Nothing on this phone was deleted. Any scan the pod no longer has is still here, and this phone may now be the only copy.")}
           </Panel>
         ) : null}
 
@@ -172,31 +179,27 @@ export default function SyncScreen() {
             rather than hidden behind the failure panel. */}
         {lastOutcome && (lastOutcome.ok || lastOutcome.failed.length > 0) ? (
           <ChipRow>
-            <Chip label="NEW" value={String(lastOutcome.fetched)} tone="good" />
-            <Chip label="ALREADY HELD" value={String(lastOutcome.skipped)} />
+            <Chip label={tr('NEW')} value={String(lastOutcome.fetched)} tone="good" />
+            <Chip label={tr('ALREADY HELD')} value={String(lastOutcome.skipped)} />
             {lastOutcome.failed.length > 0 ? (
-              <Chip label="FAILED" value={String(lastOutcome.failed.length)} tone="bad" />
+              <Chip label={tr('FAILED')} value={String(lastOutcome.failed.length)} tone="bad" />
             ) : null}
             {lastOutcome.invalid > 0 ? (
-              <Chip label="VIOLATIONS" value={String(lastOutcome.invalid)} tone="bad" />
+              <Chip label={tr('VIOLATIONS')} value={String(lastOutcome.invalid)} tone="bad" />
             ) : null}
           </ChipRow>
         ) : null}
       </Card>
 
-      <Card eyebrow="Pod" title="How to connect">
+      <Card eyebrow={tr('Pod')} title={tr('How to connect')}>
         <Muted>
-          Put this phone and the pod on the same WiFi network, then pull. Once the
-          pod&apos;s own network ({POD_SSID}) is set up, joining it will be all it takes.
-          Android will say &quot;connected, no internet&quot; on that network, which is
-          correct: the pod is not a route to the internet.
+          {tr("Put this phone and the pod on the same WiFi network, then pull. Once the pod's own network ({ssid}) is set up, joining it will be all it takes. Android will say \"connected, no internet\" on that network, which is correct: the pod is not a route to the internet.", { ssid: POD_SSID })}
         </Muted>
 
         {/* The access point itself does not exist yet. Better said here, once,
             than discovered by three people separately. */}
-        <Panel label="Not yet broadcasting" tone="warn">
-          The pod&apos;s own WiFi network ({POD_SSID}) isn&apos;t set up yet. For now the
-          phone and pod share a phone hotspot; enter the pod&apos;s address below.
+        <Panel label={tr('Not yet broadcasting')} tone="warn">
+          {tr("The pod's own WiFi network ({ssid}) isn't set up yet. For now the phone and pod share a phone hotspot; enter the pod's address below.", { ssid: POD_SSID })}
         </Panel>
 
         <TextInput
@@ -212,7 +215,7 @@ export default function SyncScreen() {
         />
 
         {bindNote ? (
-          <Panel label="Network binding unavailable" tone="warn">
+          <Panel label={tr('Network binding unavailable')} tone="warn">
             {bindNote}
           </Panel>
         ) : null}
@@ -223,7 +226,7 @@ export default function SyncScreen() {
           style={({ pressed }) => [s.button, (busy || pressed) && { opacity: 0.6 }]}
         >
           <Text style={[type.label, { color: color.primaryForeground }]}>
-            {busy ? 'Pulling…' : 'Pull from pod'}
+            {busy ? tr('Pulling…') : tr('Pull from pod')}
           </Text>
         </Pressable>
 
@@ -233,7 +236,9 @@ export default function SyncScreen() {
               const r = await pullLatest();
               setCount(await countAdvisories());
               setImportNote({
-                text: `Pulled ${r.advisoryId}.${r.valid ? '' : ' It breaks the schema. Open it to see how.'}`,
+                text: r.valid
+                  ? tr('Pulled {id}.', { id: r.advisoryId })
+                  : tr('Pulled {id}. It breaks the schema. Open it to see how.', { id: r.advisoryId }),
                 bad: !r.valid,
               });
             } catch (e) {
@@ -243,7 +248,7 @@ export default function SyncScreen() {
           style={({ pressed }) => [s.button, s.buttonSecondary, pressed && { opacity: 0.6 }]}
         >
           <Text style={[type.label, { color: color.secondaryForeground }]}>
-            Just get the newest scan
+            {tr("Just get the newest scan")}
           </Text>
         </Pressable>
 
@@ -252,12 +257,12 @@ export default function SyncScreen() {
           style={({ pressed }) => [s.button, s.buttonSecondary, pressed && { opacity: 0.6 }]}
         >
           <Text style={[type.label, { color: color.secondaryForeground }]}>
-            Check the pod is reachable
+            {tr("Check the pod is reachable")}
           </Text>
         </Pressable>
 
         {healthError ? (
-          <Panel label="Not reachable" tone="bad">
+          <Panel label={tr('Not reachable')} tone="bad">
             {healthError}
           </Panel>
         ) : null}
@@ -266,33 +271,33 @@ export default function SyncScreen() {
           <>
             <Divider />
             <Row>
-              <Muted>Device</Muted>
+              <Muted>{tr('Device')}</Muted>
               <Text style={[type.valueSmall, { color: color.foreground }]}>
-                {health.device ?? 'unnamed'}
+                {health.device ?? tr('unnamed')}
               </Text>
             </Row>
             <Row>
-              <Muted>Advisories stored</Muted>
+              <Muted>{tr('Advisories stored')}</Muted>
               <Text style={[type.valueSmall, { color: color.foreground }]}>
-                {health.advisory_count ?? 'unknown'}
+                {health.advisory_count ?? tr('unknown')}
               </Text>
             </Row>
             <Row>
-              <Muted>Newest on the pod</Muted>
+              <Muted>{tr('Newest on the pod')}</Muted>
               <Text style={[type.valueSmall, { color: color.foreground }]}>
-                {health.latest_seq !== undefined ? `#${health.latest_seq}` : 'unknown'}
+                {health.latest_seq !== undefined ? `#${health.latest_seq}` : tr('unknown')}
               </Text>
             </Row>
             {health.storage_free_kb !== undefined ? (
               <Row>
-                <Muted>Storage free</Muted>
+                <Muted>{tr('Storage free')}</Muted>
                 <Text style={[type.valueSmall, { color: color.foreground }]}>
                   {Math.round(health.storage_free_kb / 1024)} MB
                 </Text>
               </Row>
             ) : null}
             <Row>
-              <Muted>Wire contract</Muted>
+              <Muted>{tr('Wire contract')}</Muted>
               <StatusChip
                 label={health.schema_version ?? 'UNKNOWN'}
                 tone={health.schema_version === '1.0' ? 'good' : 'bad'}
@@ -303,8 +308,8 @@ export default function SyncScreen() {
                 compatibility problem, and it is far cheaper to learn about it
                 here than one advisory at a time on the history screen. */}
             {health.schema_version && health.schema_version !== '1.0' ? (
-              <Panel label="Contract mismatch" tone="bad">
-                {`This pod is speaking schema version ${health.schema_version}; this app was built against 1.0. Some blocks may be missing or may mean something different. Update one of the two before trusting what comes across.`}
+              <Panel label={tr('Contract mismatch')} tone="bad">
+                {tr('This pod is speaking schema version {v}; this app was built against 1.0. Some blocks may be missing or may mean something different. Update one of the two before trusting what comes across.', { v: health.schema_version })}
               </Panel>
             ) : null}
 
@@ -312,7 +317,7 @@ export default function SyncScreen() {
                 is whatever the filesystem last recorded, and every timestamp it
                 emits inherits that. */}
             <Row>
-              <Muted>Pod clock</Muted>
+              <Muted>{tr('Pod clock')}</Muted>
               <StatusChip
                 label={(health.clock_source ?? 'unknown').toUpperCase()}
                 tone={
@@ -326,25 +331,20 @@ export default function SyncScreen() {
             </Row>
 
             {health.clock_source === 'filesystem' ? (
-              <Panel label="Clock not set" tone="warn">
-                The pod has not set its clock from satellite or from its battery-backed
-                clock, so it is using whatever time the last file write recorded. Every
-                timestamp on anything it sends now is wrong by an unknown amount. Leaving
-                it in open sky for a minute usually fixes it.
+              <Panel label={tr('Clock not set')} tone="warn">
+                {tr('The pod has not set its clock from satellite or from its battery-backed clock, so it is using whatever time the last file write recorded. Every timestamp on anything it sends now is wrong by an unknown amount. Leaving it in open sky for a minute usually fixes it.')}
               </Panel>
             ) : null}
 
             {skew !== null && Math.abs(skew) > 120 ? (
-              <Panel label="Clocks disagree" tone="warn">
-                This phone and the pod are about {Math.abs(Math.round(skew / 60))} minutes
-                apart. Times shown against pod timestamps will be off by roughly that much.
+              <Panel label={tr('Clocks disagree')} tone="warn">
+                {tr('This phone and the pod are about {m} minutes apart. Times shown against pod timestamps will be off by roughly that much.', { m: Math.abs(Math.round(skew / 60)) })}
               </Panel>
             ) : null}
 
             {podSyncing ? (
-              <Panel label="Pod is away" tone="unknown">
-                The pod has dropped its own Wi-Fi to go and collect from the field station.
-                It will be back in about half a minute. Nothing is wrong.
+              <Panel label={tr('Pod is away')} tone="unknown">
+                {tr('The pod has dropped its own Wi-Fi to go and collect from the field station. It will be back in about half a minute. Nothing is wrong.')}
               </Panel>
             ) : null}
           </>
@@ -356,17 +356,13 @@ export default function SyncScreen() {
         means leaving its own access point — which looks exactly like the pod
         dying if the app has not said so first.
       */}
-      <Card eyebrow="Field station" title="Weather, soil and trap data">
+      <Card eyebrow={tr('Field station')} title={tr('Weather, soil and trap data')}>
         <Muted>
-          The station standing in your field does not talk to this phone. The pod fetches
-          from it, and everything the station measures reaches you through an advisory.
-          Air temperature and soil readings come from here; so does the sticky trap photo.
+          {tr('The station standing in your field does not talk to this phone. The pod fetches from it, and everything the station measures reaches you through an advisory. Air temperature and soil readings come from here; so does the sticky trap photo.')}
         </Muted>
 
-        <Panel label="Not yet exercised on the device" tone="warn">
-          The hardware team have not yet run this against the real Jetson. It is built to
-          the contract and may work first time. If it fails, that is where to look
-          before suspecting the phone.
+        <Panel label={tr('Not yet exercised on the device')} tone="warn">
+          {tr('The hardware team have not yet run this against the real Jetson. It is built to the contract and may work first time. If it fails, that is where to look before suspecting the phone.')}
         </Panel>
 
         <Pressable
@@ -374,7 +370,7 @@ export default function SyncScreen() {
           style={({ pressed }) => [s.button, s.buttonSecondary, pressed && { opacity: 0.6 }]}
         >
           <Text style={[type.label, { color: color.secondaryForeground }]}>
-            Check the field station
+            {tr("Check the field station")}
           </Text>
         </Pressable>
 
@@ -384,7 +380,7 @@ export default function SyncScreen() {
             try {
               const r = await triggerMastSync();
               setMastNote({
-                text: `The pod is going to collect from the field station now. It will drop its own Wi-Fi for about ${r.expected_ap_downtime_s} seconds and this phone will lose it. That is expected. Wait, then pull again.`,
+                text: tr('The pod is going to collect from the field station now. It will drop its own Wi-Fi for about {s} seconds and this phone will lose it. That is expected. Wait, then pull again.', { s: r.expected_ap_downtime_s }),
                 bad: false,
               });
             } catch (e) {
@@ -394,12 +390,15 @@ export default function SyncScreen() {
           style={({ pressed }) => [s.button, s.buttonSecondary, pressed && { opacity: 0.6 }]}
         >
           <Text style={[type.label, { color: color.secondaryForeground }]}>
-            Collect from the field station now
+            {tr("Collect from the field station now")}
           </Text>
         </Pressable>
 
         {mastNote ? (
-          <Panel label={mastNote.bad ? 'Could not do that' : 'Pod is going offline briefly'} tone={mastNote.bad ? 'bad' : 'warn'}>
+          <Panel
+            label={mastNote.bad ? tr('Could not do that') : tr('Pod is going offline briefly')}
+            tone={mastNote.bad ? 'bad' : 'warn'}
+          >
             {mastNote.text}
           </Panel>
         ) : null}
@@ -408,22 +407,21 @@ export default function SyncScreen() {
           <>
             <Divider />
             {mastStale ? (
-              <Panel label="Remembered, not current" tone="unknown">
-                This is the last thing the pod told us about the field station, not a
-                reading taken just now. Tap above to check it again.
+              <Panel label={tr('Remembered, not current')} tone="unknown">
+                {tr('This is the last thing the pod told us about the field station, not a reading taken just now. Tap above to check it again.')}
               </Panel>
             ) : null}
             <Row>
-              <Muted>Collecting right now</Muted>
+              <Muted>{tr('Collecting right now')}</Muted>
               <StatusChip
-                label={mast.sync_in_progress ? 'YES' : 'NO'}
+                label={mast.sync_in_progress ? tr('YES') : tr('NO')}
                 tone={mast.sync_in_progress ? 'warn' : 'neutral'}
               />
             </Row>
             <Row>
-              <Muted>Last attempt</Muted>
+              <Muted>{tr('Last attempt')}</Muted>
               <StatusChip
-                label={mast.last_result ?? 'NEVER'}
+                label={mast.last_result ?? tr('NEVER')}
                 tone={
                   mast.last_result === 'OK'
                     ? 'good'
@@ -436,18 +434,18 @@ export default function SyncScreen() {
               />
             </Row>
             <Row>
-              <Muted>Last success</Muted>
+              <Muted>{tr('Last success')}</Muted>
               <Text style={[type.valueSmall, { color: color.foreground }]}>
-                {mast.last_success_utc ? describeAge(mast.last_success_utc) : 'never'}
+                {mast.last_success_utc ? describeAge(mast.last_success_utc) : tr('never')}
               </Text>
             </Row>
 
             <ChipRow>
-              <Chip label="READINGS" value={String(mast.records_pulled)} />
-              <Chip label="TRAP PHOTOS" value={String(mast.trap_images_pulled)} />
+              <Chip label={tr('READINGS')} value={String(mast.records_pulled)} />
+              <Chip label={tr('TRAP PHOTOS')} value={String(mast.trap_images_pulled)} />
               {mast.mast_data_age_s !== null ? (
                 <Chip
-                  label="DATA AGE"
+                  label={tr('DATA AGE')}
                   value={formatSeconds(mast.mast_data_age_s)}
                   tone={mast.mast_data_age_s > 7200 ? 'warn' : 'neutral'}
                 />
@@ -458,15 +456,14 @@ export default function SyncScreen() {
                 serving advisories, the irrigation figures keep appearing, and
                 nothing says they were computed from yesterday's weather. */}
             {mast.mast_data_age_s !== null && mast.mast_data_age_s > 7200 ? (
-              <Panel label="Station data is old" tone="warn">
-                {`The newest reading from the field station is ${formatSeconds(mast.mast_data_age_s)} old. Water-use figures worked out from it describe that weather, not today's. Check the station has power and is in range of the pod.`}
+              <Panel label={tr('Station data is old')} tone="warn">
+                {tr("The newest reading from the field station is {age} old. Water-use figures worked out from it describe that weather, not today's. Check the station has power and is in range of the pod.", { age: formatSeconds(mast.mast_data_age_s) })}
               </Panel>
             ) : null}
 
             {mast.last_result === 'MAST_NOT_FOUND' ? (
-              <Panel label="Station not found" tone="bad">
-                The pod could not see the field station&apos;s network at all. Check it is
-                powered, and that the pod was within range when it tried.
+              <Panel label={tr('Station not found')} tone="bad">
+                {tr("The pod could not see the field station's network at all. Check it is powered, and that the pod was within range when it tried.")}
               </Panel>
             ) : null}
           </>
@@ -480,12 +477,9 @@ export default function SyncScreen() {
         but it means "the app renders a real advisory" is never blocked on a
         WiFi dongle in the post.
       */}
-      <Card eyebrow="Recovery" title="Import an advisory file">
+      <Card eyebrow={tr('Recovery')} title={tr('Import an advisory file')}>
         <Muted>
-          Paste the contents of an advisory JSON file. It is validated and stored exactly
-          as a pulled one would be, and labelled as imported everywhere it appears,
-          because a file someone put on this phone is a weaker claim than a record the
-          phone collected itself.
+          {tr('Paste the contents of an advisory JSON file. It is validated and stored exactly as a pulled one would be, and labelled as imported everywhere it appears, because a file someone put on this phone is a weaker claim than a record the phone collected itself.')}
         </Muted>
 
         <TextInput
@@ -508,8 +502,8 @@ export default function SyncScreen() {
               setCount(await countAdvisories());
               setImportNote({
                 text: r.valid
-                  ? `Imported ${r.advisoryId}. It satisfies the schema.`
-                  : `Imported ${r.advisoryId}, but it breaks ${r.violations.length} schema rule${r.violations.length === 1 ? '' : 's'}. It is stored and flagged. Open it to see which.`,
+                  ? tr('Imported {id}. It satisfies the schema.', { id: r.advisoryId })
+                  : tr('Imported {id}, but it breaks {n} schema rules. It is stored and flagged. Open it to see which.', { id: r.advisoryId, n: r.violations.length }),
                 bad: !r.valid,
               });
             } catch (e) {
@@ -519,13 +513,13 @@ export default function SyncScreen() {
           style={({ pressed }) => [s.button, s.buttonSecondary, pressed && { opacity: 0.6 }]}
         >
           <Text style={[type.label, { color: color.secondaryForeground }]}>
-            Import pasted advisory
+            {tr("Import pasted advisory")}
           </Text>
         </Pressable>
 
         {importNote ? (
           <Panel
-            label={importNote.bad ? 'Check this' : 'Done'}
+            label={importNote.bad ? tr('Check this') : tr('Done')}
             tone={importNote.bad ? 'warn' : 'good'}
           >
             {importNote.text}
@@ -533,12 +527,9 @@ export default function SyncScreen() {
         ) : null}
       </Card>
 
-      <Card eyebrow="Demo" title="Replica controls">
+      <Card eyebrow={tr('Demo')} title={tr('Replica controls')}>
         <Muted>
-          The replica is seeded with six sample advisories so the app renders a full
-          history with no pod present. Five are invented and are labelled SAMPLE DATA
-          everywhere they appear. The sixth is the advisory the hardware team captured
-          from the real device on 19 September, kept byte for byte.
+          {tr('The replica is seeded with six sample advisories so the app renders a full history with no pod present. Five are invented and are labelled SAMPLE DATA everywhere they appear. The sixth is the advisory the hardware team captured from the real device on 19 September, kept byte for byte.')}
         </Muted>
 
         {/* The production guard, and the switch that turns it off. On the
@@ -548,11 +539,10 @@ export default function SyncScreen() {
         <Row>
           <View style={{ flex: 1 }}>
             <Text style={[type.label, { color: color.foreground }]}>
-              Accept simulated advisories
+              {tr('Accept simulated advisories')}
             </Text>
             <Text style={[type.small, { color: color.mutedForeground, marginTop: 2 }]}>
-              Asks the pod for advisories produced by the simulated model backend, which it
-              normally refuses to serve. For integration testing only.
+              {tr('Asks the pod for advisories produced by the simulated model backend, which it normally refuses to serve. For integration testing only.')}
             </Text>
           </View>
           <Switch
@@ -565,10 +555,8 @@ export default function SyncScreen() {
           />
         </Row>
         {allowMock ? (
-          <Panel label="Guard is off" tone="bad">
-            This phone is currently asking the pod for simulated advisories. Anything
-            pulled while this is on may be synthetic. Turn it off before showing the app
-            to anyone.
+          <Panel label={tr('Guard is off')} tone="bad">
+            {tr('This phone is currently asking the pod for simulated advisories. Anything pulled while this is on may be synthetic. Turn it off before showing the app to anyone.')}
           </Panel>
         ) : null}
 
@@ -580,7 +568,7 @@ export default function SyncScreen() {
           style={({ pressed }) => [s.button, s.buttonSecondary, pressed && { opacity: 0.6 }]}
         >
           <Text style={[type.label, { color: color.secondaryForeground }]}>
-            Reload sample advisories
+            {tr("Reload sample advisories")}
           </Text>
         </Pressable>
 
@@ -592,7 +580,7 @@ export default function SyncScreen() {
           style={({ pressed }) => [s.button, s.buttonSecondary, pressed && { opacity: 0.6 }]}
         >
           <Text style={[type.label, { color: color.secondaryForeground }]}>
-            Remove sample advisories (keeps real ones)
+            {tr("Remove sample advisories (keeps real ones)")}
           </Text>
         </Pressable>
 
@@ -605,7 +593,7 @@ export default function SyncScreen() {
           style={({ pressed }) => [s.button, s.buttonDanger, pressed && { opacity: 0.6 }]}
         >
           <Text style={[type.label, { color: color.destructive }]}>
-            Clear replica (back to never synced)
+            {tr("Clear replica (back to never synced)")}
           </Text>
         </Pressable>
       </Card>
@@ -616,10 +604,10 @@ export default function SyncScreen() {
 /** Coarse on purpose — a precise-looking age this app cannot verify is a small
  *  fabrication of its own. */
 function formatSeconds(s: number): string {
-  if (s < 90) return `${s} s`;
-  if (s < 5400) return `${Math.round(s / 60)} min`;
-  if (s < 172800) return `${Math.round(s / 3600)} h`;
-  return `${Math.round(s / 86400)} days`;
+  if (s < 90) return tr('{n} s', { n: s });
+  if (s < 5400) return tr('{n} min', { n: Math.round(s / 60) });
+  if (s < 172800) return tr('{n} h', { n: Math.round(s / 3600) });
+  return tr('{n} days', { n: Math.round(s / 86400) });
 }
 
 const s = StyleSheet.create({

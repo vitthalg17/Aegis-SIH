@@ -38,12 +38,14 @@ import type { GeoPoint } from '../../src/ui/satellite-map.tsx';
 import { ScanRow, rowVerdict } from '../../src/ui/scan-row.tsx';
 import { useStatusBarStyle } from '../../src/ui/status-bar.ts';
 import { color, radius, shadow, space, type } from '../../src/ui/theme.ts';
+import { useLanguage } from '../../src/i18n/language.tsx';
+import { currentLanguage, msg, tr } from '../../src/i18n/tr.ts';
 
 const CONNECTION = {
-  never_synced: { label: 'NEVER SYNCED', note: 'Nothing has been pulled from a pod on this phone yet.' },
-  idle: { label: 'SYNCED', note: null },
-  syncing: { label: 'SYNCING', note: 'Pulling from the pod.' },
-  failed: { label: 'SYNC FAILED', note: 'Last pull did not finish. Open the Pod tab for the reason.' },
+  never_synced: { label: msg('NEVER SYNCED'), note: msg('Nothing has been pulled from a pod on this phone yet.') },
+  idle: { label: msg('SYNCED'), note: null },
+  syncing: { label: msg('SYNCING'), note: msg('Pulling from the pod.') },
+  failed: { label: msg('SYNC FAILED'), note: msg('Last pull did not finish. Open the Pod tab for the reason.') },
 };
 
 /** How many recent scans the home page lists before "See all". */
@@ -59,6 +61,8 @@ export default function HomeScreen() {
   const { state, lastSyncUtc, refresh } = useSync();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  // Re-renders this screen, and everything on it, when the language changes.
+  useLanguage();
 
   // The band behind the status bar is dark on this screen only.
   useStatusBarStyle('light');
@@ -97,23 +101,22 @@ export default function HomeScreen() {
           </View>
           <Pressable onPress={() => router.navigate('/sync')} accessibilityRole="button">
             <Eyebrow onDeep>
-              {conn.label}
+              {tr(conn.label)}
               {state === 'idle' ? ` · ${describeAge(lastSyncUtc).toUpperCase()}` : ''}
             </Eyebrow>
           </Pressable>
         </View>
         {conn.note ? (
-          <Text style={[type.small, { color: color.deepMuted, marginTop: space.sm }]}>{conn.note}</Text>
+          <Text style={[type.small, { color: color.deepMuted, marginTop: space.sm }]}>{tr(conn.note)}</Text>
         ) : null}
       </View>
 
       <View style={{ padding: space.lg }}>
         {rows.length === 0 ? (
           <View style={s.card}>
-            <Text style={[type.cardTitle, { color: color.foreground }]}>No scans yet</Text>
+            <Text style={[type.cardTitle, { color: color.foreground }]}>{tr('No scans yet')}</Text>
             <Muted>
-              Put this phone on the pod&apos;s WiFi, then open the Pod tab and pull. Scans show
-              up here with a map of where the problems are.
+              {tr("Put this phone on the pod's WiFi, then open the Pod tab and pull. Scans show up here with a map of where the problems are.")}
             </Muted>
           </View>
         ) : null}
@@ -125,14 +128,13 @@ export default function HomeScreen() {
         {rows.length > 0 ? (
           <View style={s.card}>
             <View style={s.cardHead}>
-              <Text style={[type.cardTitle, { color: color.foreground, flex: 1 }]}>Where to look</Text>
+              <Text style={[type.cardTitle, { color: color.foreground, flex: 1 }]}>{tr('Where to look')}</Text>
               <Text style={[type.valueSmall, { color: color.fgSubtle }]}>
-                {`${spots.length} spot${spots.length === 1 ? '' : 's'}`}
+                {spots.length === 1 ? tr('1 spot') : tr('{n} spots', { n: spots.length })}
               </Text>
             </View>
             <Text style={[type.small, { color: color.mutedForeground, marginBottom: space.md }]}>
-              Every flagged finding with a GPS position from your recent scans. Tap a circle
-              to open its scan.
+              {tr('Every flagged finding with a GPS position from your recent scans. Tap a circle to open its scan.')}
             </Text>
 
             {spots.length > 0 ? (
@@ -140,22 +142,23 @@ export default function HomeScreen() {
                 <SatelliteMap points={spots} height={300} onOpen={open} fallback={<OfflinePlot spots={spots} />} />
                 <MapLegend items={legendFor(spots)} />
                 <Text style={[type.small, { color: color.fgSubtle, marginTop: space.xs }]}>
-                  {`Circles are about ${FIX_RADIUS_M} m across the GPS error: a patch of field, not one plant.`}
+                  {tr('Circles are about {m} m across the GPS error: a patch of field, not one plant.', { m: FIX_RADIUS_M })}
                 </Text>
               </>
             ) : (
               <View style={s.emptyMap}>
-                <Text style={[type.label, { color: color.unknown }]}>Nothing to map yet</Text>
+                <Text style={[type.label, { color: color.unknown }]}>{tr('Nothing to map yet')}</Text>
                 <Text style={[type.small, { color: color.unknown, marginTop: 4 }]}>
-                  No flagged finding in your recent scans had a GPS fix. Leaving the pod in open
-                  sky for a minute before scanning usually gets one.
+                  {tr('No flagged finding in your recent scans had a GPS fix. Leaving the pod in open sky for a minute before scanning usually gets one.')}
                 </Text>
               </View>
             )}
 
             {flaggedWithoutGps > 0 ? (
               <Text style={[type.small, { color: color.unknown, marginTop: space.sm }]}>
-                {`${flaggedWithoutGps} flagged scan${flaggedWithoutGps === 1 ? ' has' : 's have'} no GPS positions and ${flaggedWithoutGps === 1 ? 'is' : 'are'} not on the map.`}
+                {flaggedWithoutGps === 1
+                  ? tr('1 flagged scan has no GPS positions and is not on the map.')
+                  : tr('{n} flagged scans have no GPS positions and are not on the map.', { n: flaggedWithoutGps })}
               </Text>
             ) : null}
           </View>
@@ -164,14 +167,14 @@ export default function HomeScreen() {
         {rows.length > 0 ? (
           <>
             <Text style={[type.micro, { color: color.fgSubtle, marginBottom: space.sm }]}>
-              {`ALL ${rows.length} SCANS ON THIS PHONE`}
+              {tr('ALL {n} SCANS ON THIS PHONE', { n: rows.length })}
             </Text>
             <CountTiles
               rows={rows}
               onChange={(f) => router.push({ pathname: '/all', params: { filter: f } })}
             />
 
-            <Text style={[type.micro, { color: color.fgSubtle, marginBottom: space.sm }]}>RECENT</Text>
+            <Text style={[type.micro, { color: color.fgSubtle, marginBottom: space.sm }]}>{tr('RECENT')}</Text>
             {rows.slice(0, RECENT).map((row) => (
               <ScanRow key={row.advisoryId} row={row} />
             ))}
@@ -180,7 +183,7 @@ export default function HomeScreen() {
               accessibilityRole="button"
               style={({ pressed }) => [s.seeAll, pressed && { opacity: 0.7 }]}
             >
-              <Text style={[type.label, { color: color.primary }]}>{`See all ${rows.length} scans ›`}</Text>
+              <Text style={[type.label, { color: color.primary }]}>{tr('See all {n} scans ›', { n: rows.length })}</Text>
             </Pressable>
           </>
         ) : null}
@@ -211,18 +214,20 @@ function LatestCard({
   const top = topFinding(a);
   const recall = a.crop_health?.state === 'DISEASE' && top ? recallPercent(top) : null;
   const first = a.actions?.[0];
-  const action = first ? renderAction(first, 'en') : null;
-  const verification = first ? presentVerification(first.verification_status, 'en') : null;
+  const action = first ? renderAction(first, currentLanguage()) : null;
+  const verification = first ? presentVerification(first.verification_status, currentLanguage()) : null;
   const fieldId = fieldIdFromAdvisoryId(a.advisory_id);
   const crop = top ? describeClass(top).crop : a.crop_health?.crop;
 
   return (
-    <Pressable onPress={onOpen} accessibilityRole="button" accessibilityHint="Opens the latest scan">
+    <Pressable onPress={onOpen} accessibilityRole="button" accessibilityHint={tr('Opens the latest scan')}>
       {({ pressed }) => (
         <View style={[s.latest, { borderColor: t.border }, pressed && { opacity: 0.8 }]}>
           <View style={[s.latestBand, { backgroundColor: t.bg }]}>
             <Text style={[type.micro, { color: t.fg }]}>
-              {`LATEST${fieldId ? ` · FIELD ${fieldId}` : ''} · ${formatWhen(a.generated_at_utc).toUpperCase()}`}
+              {[tr('LATEST'), fieldId ? tr('FIELD {id}', { id: fieldId }) : null, formatWhen(a.generated_at_utc).toUpperCase()]
+                .filter(Boolean)
+                .join(' · ')}
             </Text>
             <Text style={[type.title, { color: t.fg, marginTop: 6 }]}>{verdict.text}</Text>
             {crop ? (
@@ -233,7 +238,7 @@ function LatestCard({
             {stored.origin !== 'synced' ? (
               <View style={{ marginTop: space.sm }}>
                 <StatusChip
-                  label={stored.origin === 'fixture' ? 'SAMPLE' : stored.origin === 'replay' ? 'REPLAY' : 'IMPORTED'}
+                  label={stored.origin === 'fixture' ? tr('SAMPLE') : stored.origin === 'replay' ? tr('REPLAY') : tr('IMPORTED')}
                   tone="neutral"
                 />
               </View>
@@ -243,7 +248,7 @@ function LatestCard({
           <View style={{ padding: space.lg }}>
             {recall ? (
               <Text style={[type.small, { color: color.destructive, marginBottom: space.sm }]}>
-                {`Right ${recall} of the time in tests on new cameras. Check by eye before acting.`}
+                {tr('Right {pct} of the time in tests on new cameras. Check by eye before acting.', { pct: recall })}
               </Text>
             ) : null}
 
@@ -255,7 +260,7 @@ function LatestCard({
 
             {action ? (
               <>
-                <Text style={[type.micro, { color: color.fgSubtle }]}>FIRST THING TO DO</Text>
+                <Text style={[type.micro, { color: color.fgSubtle }]}>{tr('FIRST THING TO DO')}</Text>
                 <Text
                   style={[type.body, { color: color.foreground, marginTop: 4, lineHeight: 21 }]}
                   numberOfLines={3}
@@ -264,10 +269,10 @@ function LatestCard({
                 </Text>
               </>
             ) : (
-              <Muted>No action in this scan.</Muted>
+              <Muted>{tr('No action in this scan.')}</Muted>
             )}
 
-            <Text style={[type.label, { color: color.primary, marginTop: space.md }]}>Open scan ›</Text>
+            <Text style={[type.label, { color: color.primary, marginTop: space.md }]}>{tr('Open scan ›')}</Text>
           </View>
         </View>
       )}
@@ -291,7 +296,7 @@ function problemSpots(recent: StoredAdvisory[]): Spot[] {
         lon: d.lon,
         tone: d.class === DRIED_LEAF_CLASS ? 'warn' : 'bad',
         label: info.condition,
-        sub: `${field ? `Field ${field} · ` : ''}${formatWhen(a.generated_at_utc)}`,
+        sub: [field ? tr('Field {id}', { id: field }) : null, formatWhen(a.generated_at_utc)].filter(Boolean).join(' · '),
         id: a.advisory_id,
         advisoryId: a.advisory_id,
         className: d.class,

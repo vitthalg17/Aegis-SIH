@@ -36,6 +36,7 @@ import type { WebViewMessageEvent } from 'react-native-webview';
 
 import type { Tone } from './components.tsx';
 import { chart, color, radius, space, type } from './theme.ts';
+import { tr } from '../i18n/tr.ts';
 
 export type GeoPoint = {
   lat: number;
@@ -79,7 +80,11 @@ export function SatelliteMap({
   onOpen?: (id: string) => void;
 }) {
   const [phase, setPhase] = useState<Phase>('loading');
-  const html = useMemo(() => buildHtml(points, radiusM, !!onOpen), [points, radiusM, onOpen]);
+  const openLabel = tr('Open scan');
+  const html = useMemo(
+    () => buildHtml(points, radiusM, !!onOpen, openLabel),
+    [points, radiusM, onOpen, openLabel],
+  );
 
   const onMessage = (e: WebViewMessageEvent) => {
     let msg: { type?: string; id?: string } = {};
@@ -98,8 +103,7 @@ export function SatelliteMap({
       <View>
         {fallback}
         <Text style={[type.small, { color: color.unknown, marginTop: space.sm }]}>
-          No internet, so no satellite image. The positions are the same; only the picture
-          underneath is missing.
+          {tr('No internet, so no satellite image. The positions are the same; only the picture underneath is missing.')}
         </Text>
       </View>
     );
@@ -129,7 +133,7 @@ export function SatelliteMap({
         <View style={s.loading} pointerEvents="none">
           <ActivityIndicator color={color.primary} />
           <Text style={[type.small, { color: color.mutedForeground, marginTop: space.xs }]}>
-            Loading satellite image
+            {tr('Loading satellite image')}
           </Text>
         </View>
       ) : null}
@@ -137,7 +141,7 @@ export function SatelliteMap({
   );
 }
 
-function buildHtml(points: GeoPoint[], radiusM: number, linkable: boolean): string {
+function buildHtml(points: GeoPoint[], radiusM: number, linkable: boolean, openLabel: string): string {
   const data = points.map((p) => ({
     lat: p.lat,
     lon: p.lon,
@@ -202,7 +206,7 @@ function buildHtml(points: GeoPoint[], radiusM: number, linkable: boolean): stri
       radius: 4, color: '#000', weight: 1, fillColor: p.stroke, fillOpacity: 1,
     }).addTo(map);
     var html = '<b>' + esc(p.label) + '</b>' + (p.sub ? '<br>' + esc(p.sub) : '') +
-      (${linkable} && p.id ? '<br><a href="#" data-id="' + esc(p.id) + '">Open scan</a>' : '');
+      (${linkable} && p.id ? '<br><a href="#" data-id="' + esc(p.id) + '">' + esc(${JSON.stringify(openLabel)}) + '</a>' : '');
     c.bindPopup(html); d.bindPopup(html);
     group.push([p.lat, p.lon]);
   });

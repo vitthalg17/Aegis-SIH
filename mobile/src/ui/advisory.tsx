@@ -47,6 +47,7 @@ import type { Language } from '../schema/templates.ts';
 import type { AdvisoryOrigin } from '../db/advisories.ts';
 import type { Violation } from '../schema/validate.ts';
 import { describeViolation } from '../schema/validate.ts';
+import { dateLocale, msg, tr } from '../i18n/tr.ts';
 
 // ---- Origin and backend ---------------------------------------------------
 
@@ -68,18 +69,18 @@ export function OriginBanner({ origin }: { origin: AdvisoryOrigin }) {
     fixture: {
       // True of all six shipped samples, including the one real device
       // capture among them: none came from this farmer's pod.
-      label: 'SAMPLE DATA',
-      body: 'Built into the app for testing. Not from your pod or your field.',
+      label: tr('SAMPLE DATA'),
+      body: tr('Built into the app for testing. Not from your pod or your field.'),
       tone: 'warn',
     },
     replay: {
-      label: 'REPLAY',
-      body: 'Real model output on a recorded video, not a live scan.',
+      label: tr('REPLAY'),
+      body: tr('Real model output on a recorded video, not a live scan.'),
       tone: 'unknown',
     },
     imported: {
-      label: 'IMPORTED FILE',
-      body: 'Loaded from a file, not pulled from a pod. Check where it came from.',
+      label: tr('IMPORTED FILE'),
+      body: tr('Loaded from a file, not pulled from a pod. Check where it came from.'),
       tone: 'unknown',
     },
   };
@@ -117,12 +118,12 @@ export function BackendBanner({ advisory }: { advisory: Advisory }) {
   return (
     <View style={[s.banner, { borderColor: t.border, backgroundColor: t.bg }]}>
       <Text style={[type.micro, { color: t.fg }]}>
-        {mock ? 'SIMULATED MODEL OUTPUT · NOT A MEASUREMENT' : 'RAN ON THE FALLBACK ENGINE'}
+        {mock ? tr('SIMULATED MODEL OUTPUT · NOT A MEASUREMENT') : tr('RAN ON THE FALLBACK ENGINE')}
       </Text>
       <Text style={[type.small, { color: t.fg, marginTop: 5 }]}>
         {mock
-          ? 'This advisory was produced by the simulated inference backend, not by the model running on the device. A pod in normal operation refuses to hand these out at all. Nothing here is a reading of a real plant.'
-          : 'Same model, but the pod did not start up normally. Worth telling whoever maintains it.'}
+          ? tr('This advisory was produced by the simulated inference backend, not by the model running on the device. A pod in normal operation refuses to hand these out at all. Nothing here is a reading of a real plant.')
+          : tr('Same model, but the pod did not start up normally. Worth telling whoever maintains it.')}
       </Text>
     </View>
   );
@@ -136,11 +137,12 @@ export function ViolationsCard({ violations }: { violations: Violation[] }) {
   return (
     <View style={s.violations}>
       <Text style={[type.micro, { color: color.destructive }]}>
-        {violations.length} SCHEMA VIOLATION{violations.length === 1 ? '' : 'S'}
+        {violations.length === 1
+          ? tr('1 SCHEMA VIOLATION')
+          : tr('{n} SCHEMA VIOLATIONS', { n: violations.length })}
       </Text>
       <Text style={[type.small, { color: color.destructive, marginTop: 6 }]}>
-        This advisory does not satisfy the contract the pod and this app share. Do
-        not act on it without checking the pod.
+        {tr('This advisory does not satisfy the contract the pod and this app share. Do not act on it without checking the pod.')}
       </Text>
       {violations.map((v, i) => (
         <Text key={i} style={[type.valueSmall, { color: color.destructive, marginTop: 5 }]}>
@@ -162,29 +164,29 @@ const HEALTH_TONE: Record<string, Tone> = {
 };
 
 const HEALTH_HEADLINE: Record<string, string> = {
-  HEALTHY: 'Looks healthy',
-  DISEASE: 'Something was found',
-  NOT_CROP: 'This was not crop',
-  UNCERTAIN: 'Not clear enough to say',
-  NO_DATA: 'Nothing was scanned',
+  HEALTHY: msg('Looks healthy'),
+  DISEASE: msg('Something was found'),
+  NOT_CROP: msg('This was not crop'),
+  UNCERTAIN: msg('Not clear enough to say'),
+  NO_DATA: msg('Nothing was scanned'),
 };
 
 const HEALTH_BODY: Record<string, string> = {
   HEALTHY:
-    'The model positively recognised healthy crop. That is a stronger call than "nothing found".',
-  DISEASE: 'Check it by eye before treating anything.',
-  NOT_CROP: 'Mostly soil, path or hands, so there was nothing to diagnose.',
-  UNCERTAIN: 'The frames disagreed, so the pod did not pick an answer.',
-  NO_DATA: 'No frames were evaluated in this scan.',
+    msg('The model positively recognised healthy crop. That is a stronger call than "nothing found".'),
+  DISEASE: msg('Check it by eye before treating anything.'),
+  NOT_CROP: msg('Mostly soil, path or hands, so there was nothing to diagnose.'),
+  UNCERTAIN: msg('The frames disagreed, so the pod did not pick an answer.'),
+  NO_DATA: msg('No frames were evaluated in this scan.'),
 };
 
 /** The reasons the aggregator gives for declining to call a verdict. */
 const HEALTH_REASON_COPY: Record<string, string> = {
   MULTIPLE_CROPS_DETECTED:
-    'The camera saw more than one crop. Did you cross a field edge or an intercropped strip? The findings below may belong to different crops.',
-  HIGH_UNCERTAINTY: 'The frames disagreed too much for one answer to stand out.',
+    msg('The camera saw more than one crop. Did you cross a field edge or an intercropped strip? The findings below may belong to different crops.'),
+  HIGH_UNCERTAINTY: msg('The frames disagreed too much for one answer to stand out.'),
   UNCONFIRMED_DETECTIONS:
-    'Something was seen, but never in two frames in a row, so it was not called.',
+    msg('Something was seen, but never in two frames in a row, so it was not called.'),
 };
 
 /**
@@ -216,7 +218,7 @@ export function CropHealthCard({
           one without the other — this has to read in sun and in grayscale. */}
       <View style={[s.verdictBand, { backgroundColor: t.bg, borderBottomColor: t.border }]}>
         <Text style={[type.title, { color: t.fg }]}>
-          {HEALTH_HEADLINE[health.state] ?? String(health.state)}
+          {tr(HEALTH_HEADLINE[health.state] ?? String(health.state))}
         </Text>
         {described ? (
           <Text style={[type.label, { color: t.fg, marginTop: 4 }]}>{described.label}</Text>
@@ -226,7 +228,7 @@ export function CropHealthCard({
           </Text>
         ) : null}
         <Text style={[type.small, { color: t.fg, marginTop: 6, opacity: 0.9 }]}>
-          {HEALTH_BODY[health.state] ?? ''}
+          {tr(HEALTH_BODY[health.state] ?? '')}
         </Text>
       </View>
 
@@ -236,16 +238,16 @@ export function CropHealthCard({
             accuracy — agreement across frames is the more honest signal. */}
         {total > 0 ? (
           <Text style={[type.label, { color: color.foreground }]}>
-            {`${health.frames_agreeing} of ${total} frames agreed`}
+            {tr('{n} of {total} frames agreed', { n: health.frames_agreeing, total })}
           </Text>
         ) : null}
 
         {total > 0 ? (
           <EvidenceBar
             segments={[
-              { count: health.frames_agreeing, label: 'agreed', tone },
-              { count: other, label: 'disagreed', tone: 'neutral' },
-              { count: health.frames_uncertain, label: 'unsure', tone: 'warn' },
+              { count: health.frames_agreeing, label: tr('agreed'), tone },
+              { count: other, label: tr('disagreed'), tone: 'neutral' },
+              { count: health.frames_uncertain, label: tr('unsure'), tone: 'warn' },
             ]}
           />
         ) : null}
@@ -254,14 +256,14 @@ export function CropHealthCard({
             for the model and wrong for the farmer. Never "your sugarcane is
             healthy" when what was detected is dried leaves. */}
         {isDriedLeaf ? (
-          <Panel label="What this actually means" tone="warn">
-            {DRIED_LEAF_CAVEAT}
+          <Panel label={tr('What this actually means')} tone="warn">
+            {tr(DRIED_LEAF_CAVEAT)}
           </Panel>
         ) : null}
 
         {health.reason ? (
-          <Panel label="Heads up" tone="warn">
-            {HEALTH_REASON_COPY[health.reason] ?? humaniseStatus(health.reason)}
+          <Panel label={tr('Heads up')} tone="warn">
+            {HEALTH_REASON_COPY[health.reason] ? tr(HEALTH_REASON_COPY[health.reason]) : humaniseStatus(health.reason)}
           </Panel>
         ) : null}
 
@@ -275,10 +277,10 @@ export function CropHealthCard({
 // ---- Growth stage ---------------------------------------------------------
 
 const STAGE_LABEL: Record<string, string> = {
-  initial: 'Just established',
-  development: 'Growing out',
-  mid_season: 'Full canopy',
-  late_season: 'Ripening',
+  initial: msg('Just established'),
+  development: msg('Growing out'),
+  mid_season: msg('Full canopy'),
+  late_season: msg('Ripening'),
 };
 
 /**
@@ -302,43 +304,56 @@ export function GrowthStageCard({ stage }: { stage: GrowthStage }) {
   const canopy = stage.canopy_cover_measured;
   const expected = stage.canopy_cover_expected_range;
 
+  const stageName = tr(STAGE_LABEL[stage.stage ?? ''] ?? String(stage.stage));
   const summary = known
-    ? `${STAGE_LABEL[stage.stage ?? ''] ?? String(stage.stage)}${
-        typeof days === 'number' ? ` · day ${days}${typeof cycle === 'number' ? ` of ~${cycle}` : ''}` : ''
-      }${cycleFromFarmer ? '' : ' · variety assumed'}`
-    : `Not worked out: ${shortStatus(stage.reason ?? stage.status).toLowerCase()}`;
+    ? [
+        stageName,
+        typeof days === 'number'
+          ? typeof cycle === 'number'
+            ? tr('day {d} of ~{c}', { d: days, c: cycle })
+            : tr('day {d}', { d: days })
+          : null,
+        cycleFromFarmer ? null : tr('variety assumed'),
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : tr('Not worked out: {why}', { why: shortStatus(stage.reason ?? stage.status).toLowerCase() });
 
   return (
     <Card
-      eyebrow="Season"
-      title="Crop stage"
+      eyebrow={tr('Season')}
+      title={tr('Crop stage')}
       summary={summary}
       summaryTone={known ? 'neutral' : 'unknown'}
       tile={
         known && typeof days === 'number'
           ? {
               icon: <SproutIcon color={color.secondaryForeground} />,
-              label: 'CROP STAGE',
-              value: `Day ${days}`,
+              label: tr('CROP STAGE'),
+              value: tr('Day {d}', { d: days }),
               visual:
                 typeof cycle === 'number' && cycle > 0 ? (
                   <ProgressBar fraction={days / cycle} tone="good" />
                 ) : undefined,
-              caption: `${STAGE_LABEL[stage.stage ?? ''] ?? String(stage.stage)}${
-                typeof cycle === 'number' ? ` · of ~${cycle} days` : ''
-              }${cycleFromFarmer ? '' : ' · variety assumed'}`,
+              caption: [
+                stageName,
+                typeof cycle === 'number' ? tr('of ~{c} days', { c: cycle }) : null,
+                cycleFromFarmer ? null : tr('variety assumed'),
+              ]
+                .filter(Boolean)
+                .join(' · '),
             }
           : {
               icon: <SproutIcon color={color.unknown} />,
-              label: 'CROP STAGE',
-              value: known ? (STAGE_LABEL[stage.stage ?? ''] ?? 'Known') : 'Not known',
+              label: tr('CROP STAGE'),
+              value: known ? stageName : tr('Not known'),
               muted: !known,
               caption: known ? undefined : shortStatus(stage.reason ?? stage.status),
             }
       }
     >
       {!known ? (
-        <Panel label="Stage not worked out" tone="unknown">
+        <Panel label={tr('Stage not worked out')} tone="unknown">
           {humaniseStatus(stage.reason ?? stage.status)}
         </Panel>
       ) : (
@@ -346,7 +361,7 @@ export function GrowthStageCard({ stage }: { stage: GrowthStage }) {
           <View style={s.head}>
             <View style={{ flex: 1 }}>
               <Text style={[type.cardTitle, { color: color.foreground }]}>
-                {STAGE_LABEL[stage.stage ?? ''] ?? String(stage.stage)}
+                {stageName}
               </Text>
               <Text style={[type.valueSmall, { color: color.fgSubtle, marginTop: 3 }]}>
                 {stage.crop ? `${stage.crop} · ` : ''}
@@ -354,7 +369,7 @@ export function GrowthStageCard({ stage }: { stage: GrowthStage }) {
               </Text>
             </View>
             {typeof stage.kc === 'number' ? (
-              <Chip label="WATER FACTOR" value={stage.kc.toFixed(2)} />
+              <Chip label={tr('WATER FACTOR')} value={stage.kc.toFixed(2)} />
             ) : null}
           </View>
 
@@ -364,8 +379,8 @@ export function GrowthStageCard({ stage }: { stage: GrowthStage }) {
               min={0}
               max={cycle}
               tone="good"
-              markerLabel={`day ${days}`}
-              caption={`Day ${days} of an assumed ${cycle}-day cycle.`}
+              markerLabel={tr('day {d}', { d: days })}
+              caption={tr('Day {d} of an assumed {c}-day cycle.', { d: days, c: cycle })}
             />
           ) : null}
 
@@ -374,16 +389,18 @@ export function GrowthStageCard({ stage }: { stage: GrowthStage }) {
               wrong, not the crop — which is a useful thing to be told. */}
           {typeof canopy === 'number' && expected ? (
             <Panel
-              label="Canopy against the stage"
+              label={tr('Canopy against the stage')}
               tone={canopy >= expected[0] && canopy <= expected[1] ? 'good' : 'warn'}
             >
-              {`The scan measured ${Math.round(canopy * 100)}% ground cover. A crop at this stage is usually between ${Math.round(
-                expected[0] * 100,
-              )}% and ${Math.round(expected[1] * 100)}%.`}
+              {tr('The scan measured {m}% ground cover. A crop at this stage is usually between {lo}% and {hi}%.', {
+                m: Math.round(canopy * 100),
+                lo: Math.round(expected[0] * 100),
+                hi: Math.round(expected[1] * 100),
+              })}
               {canopy < expected[0]
-                ? ' Less cover than expected can mean the planting date entered is too early, or that the crop is behind.'
+                ? ` ${tr('Less cover than expected can mean the planting date entered is too early, or that the crop is behind.')}`
                 : canopy > expected[1]
-                  ? ' More cover than expected usually means the planting date entered is too late.'
+                  ? ` ${tr('More cover than expected usually means the planting date entered is too late.')}`
                   : ''}
             </Panel>
           ) : null}
@@ -394,12 +411,12 @@ export function GrowthStageCard({ stage }: { stage: GrowthStage }) {
 
       {/* The variety cycle, and whose claim it is. */}
       <Panel
-        label={cycleFromFarmer ? 'Variety · confirmed by you' : 'Variety · assumed'}
+        label={cycleFromFarmer ? tr('Cultivar: Verified by Farmer') : tr('Default Variety Assumption')}
         tone={cycleFromFarmer ? 'good' : 'warn'}
       >
         {cycleFromFarmer
-          ? `Worked out using the ${cycle ?? 'stated'}-day cycle you entered for your own seed variety.`
-          : `No seed variety has been entered, so a regional default of ${cycle ?? 'the standard'} days was assumed. If you know your variety, the stage above will get noticeably better once you enter it.`}
+          ? tr('Worked out using the {c}-day cycle you entered for your own seed variety.', { c: cycle ?? '?' })
+          : tr('No seed variety has been entered, so a regional default of {c} days was assumed. If you know your variety, the stage above will get noticeably better once you enter it.', { c: cycle ?? '?' })}
       </Panel>
 
       {stage.document_reference ? (
@@ -414,30 +431,30 @@ export function GrowthStageCard({ stage }: { stage: GrowthStage }) {
 // ---- Inputs ---------------------------------------------------------------
 
 const INPUT_LABEL: Record<string, string> = {
-  pod_thermal: 'Pod thermal camera',
-  pod_gps: 'Pod GPS',
-  pod_camera_rgb: 'Pod colour camera',
-  pod_ndvi: 'Pod infrared camera',
-  mast_ambient: 'Air temp / humidity',
-  mast_soil: 'Soil probes',
-  mast_trap: 'Sticky trap camera',
+  pod_thermal: msg('Pod thermal camera'),
+  pod_gps: msg('Pod GPS'),
+  pod_camera_rgb: msg('Pod colour camera'),
+  pod_ndvi: msg('Pod infrared camera'),
+  mast_ambient: msg('Air temp / humidity'),
+  mast_soil: msg('Soil probes'),
+  mast_trap: msg('Sticky trap camera'),
 };
 
 /** The same sensors, short enough to list in one folded line. */
 const INPUT_SHORT: Record<string, string> = {
-  pod_thermal: 'Thermal',
-  pod_gps: 'GPS',
-  pod_camera_rgb: 'Camera',
-  pod_ndvi: 'Infrared',
-  mast_ambient: 'Air sensor',
-  mast_soil: 'Soil probes',
-  mast_trap: 'Trap camera',
+  pod_thermal: msg('Thermal'),
+  pod_gps: msg('GPS'),
+  pod_camera_rgb: msg('Camera'),
+  pod_ndvi: msg('Infrared'),
+  mast_ambient: msg('Air sensor'),
+  mast_soil: msg('Soil probes'),
+  mast_trap: msg('Trap camera'),
 };
 
 const INPUT_STATUS_SHORT: Record<string, string> = {
-  PENDING_CALIBRATION: 'needs calibration',
-  MOCK_PROVISIONAL: 'simulated',
-  ABSENT: 'not connected',
+  PENDING_CALIBRATION: msg('needs calibration'),
+  MOCK_PROVISIONAL: msg('simulated'),
+  ABSENT: msg('not connected'),
 };
 
 const INPUT_STATUS_TONE: Record<string, Tone> = {
@@ -448,10 +465,10 @@ const INPUT_STATUS_TONE: Record<string, Tone> = {
 };
 
 const INPUT_STATUS_LABEL: Record<string, string> = {
-  OK: 'WORKING',
-  PENDING_CALIBRATION: 'NEEDS CALIBRATION',
-  MOCK_PROVISIONAL: 'SIMULATED',
-  ABSENT: 'NOT CONNECTED',
+  OK: msg('WORKING'),
+  PENDING_CALIBRATION: msg('NEEDS CALIBRATION'),
+  MOCK_PROVISIONAL: msg('SIMULATED'),
+  ABSENT: msg('NOT CONNECTED'),
 };
 
 /**
@@ -465,11 +482,11 @@ const INPUT_STATUS_LABEL: Record<string, string> = {
  */
 const INPUT_STATUS_BODY: Record<string, string> = {
   PENDING_CALIBRATION:
-    'This sensor is connected and working. What it measures directly is real and is shown. A second figure worked out from it needs a calibration step that has not been done, so that figure was left out rather than guessed.',
+    msg('This sensor is connected and working. What it measures directly is real and is shown. A second figure worked out from it needs a calibration step that has not been done, so that figure was left out rather than guessed.'),
   MOCK_PROVISIONAL:
-    'This sensor is being simulated. Nothing that depends on it is a measurement of your field.',
+    msg('This sensor is being simulated. Nothing that depends on it is a measurement of your field.'),
   ABSENT:
-    'This sensor was not connected during the scan. Anything that needed it is missing rather than estimated.',
+    msg('This sensor was not connected during the scan. Anything that needed it is missing rather than estimated.'),
 };
 
 /**
@@ -480,9 +497,10 @@ const INPUT_STATUS_BODY: Record<string, string> = {
  * looking at the scene in the video being replayed. Showing NOT CONNECTED
  * would send someone to check a cable that is fine.
  */
-const REPLAY_THERMAL_LABEL = 'NOT USED – REPLAY';
-const REPLAY_THERMAL_BODY =
-  'This scan is a replay of a recorded video. The thermal camera was connected, but it was not looking at the scene in the video, so its reading was left out rather than attached to the wrong field.';
+const REPLAY_THERMAL_LABEL = msg('NOT USED: REPLAY');
+const REPLAY_THERMAL_BODY = msg(
+  'This scan is a replay of a recorded video. The thermal camera was connected, but it was not looking at the scene in the video, so its reading was left out rather than attached to the wrong field.',
+);
 
 function isReplayThermal(input: AdvisoryInput, thermalReason?: string | null): boolean {
   // Keyed on the reason, not on ABSENT alone: whatever status the pod gives the
@@ -514,14 +532,13 @@ export function InputsCard({
   if (!inputs || inputs.length === 0) {
     return (
       <Card
-        eyebrow="Provenance"
-        title="Sensors used"
-        summary="None declared, so nothing shows what was measured"
+        eyebrow={tr('Provenance')}
+        title={tr('Sensors used')}
+        summary={tr('None declared, so nothing shows what was measured')}
         summaryTone="bad"
       >
-        <Panel label="Nothing declared" tone="bad">
-          This advisory does not list the sensors it came from, so there is no way to
-          tell which of its numbers were measured and which were not.
+        <Panel label={tr('Nothing declared')} tone="bad">
+          {tr('This advisory does not list the sensors it came from, so there is no way to tell which of its numbers were measured and which were not.')}
         </Panel>
       </Card>
     );
@@ -534,20 +551,21 @@ export function InputsCard({
   const notWorking = inputs
     .filter((x) => !working.includes(x))
     .map((x) => {
-      const name = INPUT_SHORT[x.name] ?? x.name.replace(/_/g, ' ');
-      if (isReplayThermal(x, thermalReason)) return `${name} not used (replay)`;
-      return `${name} ${INPUT_STATUS_SHORT[String(x.status)] ?? String(x.status).toLowerCase()}`;
+      const name = INPUT_SHORT[x.name] ? tr(INPUT_SHORT[x.name]) : x.name.replace(/_/g, ' ');
+      if (isReplayThermal(x, thermalReason)) return tr('{name} not used (replay)', { name });
+      const state = INPUT_STATUS_SHORT[String(x.status)];
+      return `${name} ${state ? tr(state) : String(x.status).toLowerCase()}`;
     });
   const anySimulated = inputs.some((x) => x.status === 'MOCK_PROVISIONAL');
 
   return (
     <Card
-      eyebrow="Provenance"
-      title="Sensors used"
+      eyebrow={tr('Provenance')}
+      title={tr('Sensors used')}
       summary={
         notWorking.length === 0
-          ? `All ${inputs.length} working`
-          : `${working.length} of ${inputs.length} fully working · ${notWorking.join(' · ')}`
+          ? tr('All {n} working', { n: inputs.length })
+          : `${tr('{w} of {n} fully working', { w: working.length, n: inputs.length })} · ${notWorking.join(' · ')}`
       }
       summaryTone={anySimulated ? 'bad' : notWorking.length > 0 ? 'unknown' : 'good'}
     >
@@ -555,20 +573,23 @@ export function InputsCard({
         const status = input.status as InputStatus;
         const replayThermal = isReplayThermal(input, thermalReason);
         const label = replayThermal
-          ? REPLAY_THERMAL_LABEL
-          : (INPUT_STATUS_LABEL[status] ?? String(status).replace(/_/g, ' '));
+          ? tr(REPLAY_THERMAL_LABEL)
+          : INPUT_STATUS_LABEL[status]
+            ? tr(INPUT_STATUS_LABEL[status])
+            : String(status).replace(/_/g, ' ');
         const tone: Tone = replayThermal ? 'neutral' : (INPUT_STATUS_TONE[status] ?? 'bad');
-        const body = replayThermal ? REPLAY_THERMAL_BODY : INPUT_STATUS_BODY[status];
+        const bodyEn = replayThermal ? REPLAY_THERMAL_BODY : INPUT_STATUS_BODY[status];
+        const body = bodyEn ? tr(bodyEn) : undefined;
         return (
           <View key={`${input.name}-${i}`}>
             {i > 0 ? <Divider /> : null}
             <Row>
               <View style={{ flex: 1 }}>
                 <Text style={[type.label, { color: color.foreground }]}>
-                  {INPUT_LABEL[input.name] ?? input.name.replace(/_/g, ' ')}
+                  {INPUT_LABEL[input.name] ? tr(INPUT_LABEL[input.name]) : input.name.replace(/_/g, ' ')}
                 </Text>
                 <Text style={[type.valueSmall, { color: color.fgSubtle, marginTop: 3 }]}>
-                  {input.source_node === 'POD' ? 'on the pod you carry' : 'on the field station'}
+                  {input.source_node === 'POD' ? tr('on the pod you carry') : tr('on the field station')}
                 </Text>
               </View>
               <StatusChip label={label} tone={tone} />
@@ -627,7 +648,7 @@ export function ActionsCard({
   if (!actions || actions.length === 0) {
     return (
       <Card title={language === 'hi' ? 'क्या करें' : 'What to do'} right={toggle}>
-        <Muted>No actions in this advisory.</Muted>
+        <Muted>{language === 'hi' ? 'इस सलाह में कोई कार्य नहीं है।' : 'No actions in this advisory.'}</Muted>
       </Card>
     );
   }
@@ -827,26 +848,26 @@ export function ScanCard({ advisory }: { advisory: Advisory }) {
 
   return (
     <Card
-      eyebrow="Scan"
-      title="Scan details"
+      eyebrow={tr('Scan')}
+      title={tr('Scan details')}
       summary={[
-        `${scan.frames_evaluated} of ${scan.frames_captured} frames used`,
+        tr('{n} of {total} frames used', { n: scan.frames_evaluated, total: scan.frames_captured }),
         seconds !== null ? formatDuration(seconds) : null,
-        advisory.replay ? 'replayed video' : String(scan.mode).replace(/_/g, ' '),
+        advisory.replay ? tr('replayed video') : modeLabel(scan.mode),
       ]
         .filter(Boolean)
         .join(' · ')}
       summaryTone={mostDiscarded ? 'warn' : 'neutral'}
     >
       <Row>
-        <Muted>Started</Muted>
+        <Muted>{tr('Started')}</Muted>
         <Text style={[type.valueSmall, { color: color.foreground }]}>
           {formatStamp(scan.started_utc)}
         </Text>
       </Row>
       {scan.ended_utc ? (
         <Row>
-          <Muted>Finished</Muted>
+          <Muted>{tr('Finished')}</Muted>
           <Text style={[type.valueSmall, { color: color.foreground }]}>
             {formatStamp(scan.ended_utc)}
           </Text>
@@ -854,9 +875,9 @@ export function ScanCard({ advisory }: { advisory: Advisory }) {
       ) : null}
 
       <View style={s.statRow}>
-        <Stat value={String(scan.frames_captured)} caption="Frames taken" />
-        <Stat value={String(scan.frames_evaluated)} caption="Good enough to use" />
-        <Stat value={String(scan.tiles_classified)} caption="Patches examined" />
+        <Stat value={String(scan.frames_captured)} caption={tr('Frames taken')} />
+        <Stat value={String(scan.frames_evaluated)} caption={tr('Good enough to use')} />
+        <Stat value={String(scan.tiles_classified)} caption={tr('Patches examined')} />
       </View>
 
       {/* Moved here from the verdict card. Thrown-away frames never entered
@@ -864,7 +885,7 @@ export function ScanCard({ advisory }: { advisory: Advisory }) {
           beside the verdict they had no part in. */}
       {rejectedNotCrop + rejectedOod > 0 ? (
         <Text style={[type.small, { color: color.mutedForeground, marginTop: space.sm }]}>
-          {`${rejectedNotCrop} frame${rejectedNotCrop === 1 ? ' was' : 's were'} not crop and ${rejectedOod} did not look like anything the model was trained on. Both were set aside before the vote rather than forced into a class.`}
+          {tr('{a} frames were not crop and {b} did not look like anything the model was trained on. Both were set aside before the vote rather than forced into a class.', { a: rejectedNotCrop, b: rejectedOod })}
         </Text>
       ) : null}
 
@@ -872,31 +893,31 @@ export function ScanCard({ advisory }: { advisory: Advisory }) {
           A scan that kept a third of its frames is a scan worth repeating, and
           nothing else on the screen says so. */}
       {mostDiscarded ? (
-        <Panel label="Most frames were discarded" tone="warn">
-          {`Only ${scan.frames_evaluated} of ${scan.frames_captured} frames were sharp and well-lit enough to use. Walking more slowly, holding the pod steadier, or scanning out of hard direct sun will keep more of them.`}
+        <Panel label={tr('Most frames were discarded')} tone="warn">
+          {tr('Only {n} of {total} frames were sharp and well-lit enough to use. Walking more slowly, holding the pod steadier, or scanning out of hard direct sun will keep more of them.', { n: scan.frames_evaluated, total: scan.frames_captured })}
         </Panel>
       ) : null}
 
       <Divider />
 
       <Row>
-        <Muted>Distance walked</Muted>
+        <Muted>{tr('Distance walked')}</Muted>
         <Text style={[type.valueSmall, { color: color.foreground }]}>
           {scan.distance_walked_m === null
-            ? `not recorded${scan.distance_reason ? ` · ${shortStatus(scan.distance_reason).toLowerCase()}` : ''}`
+            ? `${tr('not recorded')}${scan.distance_reason ? ` · ${shortStatus(scan.distance_reason).toLowerCase()}` : ''}`
             : `${scan.distance_walked_m} m`}
         </Text>
       </Row>
 
       <ChipRow>
-        <Chip label="MODE" value={String(scan.mode).replace(/_/g, ' ')} />
-        <Chip label="ENGINE" value={String(advisory.inference_backend).toUpperCase()} />
+        <Chip label={tr('MODE')} value={modeLabel(scan.mode)} />
+        <Chip label={tr('ENGINE')} value={String(advisory.inference_backend).toUpperCase()} />
         <Chip
-          label="SOURCE"
-          value={advisory.replay ? 'RECORDED' : 'LIVE'}
+          label={tr('SOURCE')}
+          value={advisory.replay ? tr('RECORDED') : tr('LIVE')}
           tone={advisory.replay ? 'unknown' : 'good'}
         />
-        <Chip label="SEQ" value={String(advisory.seq)} />
+        <Chip label={tr('SEQ')} value={String(advisory.seq)} />
       </ChipRow>
     </Card>
   );
@@ -904,14 +925,18 @@ export function ScanCard({ advisory }: { advisory: Advisory }) {
 
 export function formatStamp(iso: string): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(dateLocale());
+}
+
+function modeLabel(mode: unknown): string {
+  return mode === 'handheld_pod' ? tr('handheld pod') : String(mode).replace(/_/g, ' ');
 }
 
 /** "25 Sep, 3:15 pm" — the form a person says out loud. */
 export function formatWhen(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString(dateLocale(), {
     day: 'numeric',
     month: 'short',
     hour: 'numeric',
@@ -920,8 +945,8 @@ export function formatWhen(iso: string): string {
 }
 
 function formatDuration(seconds: number): string {
-  if (seconds < 90) return `${seconds} s walk`;
-  return `${Math.round(seconds / 60)} min walk`;
+  if (seconds < 90) return tr('{s} s walk', { s: seconds });
+  return tr('{m} min walk', { m: Math.round(seconds / 60) });
 }
 
 const s = StyleSheet.create({

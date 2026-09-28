@@ -36,6 +36,7 @@ import { LeafIcon, ProgressBar } from './tiles.tsx';
 import { color, space, type } from './theme.ts';
 import type { CanopyCover, Vegetation, VegetationIndex } from '../schema/advisory.ts';
 import { VEGETATION_CAVEAT } from '../schema/advisory.ts';
+import { msg, tr } from '../i18n/tr.ts';
 
 const BAND_TONE: Record<string, Tone> = {
   LOWER_TAIL: 'warn',
@@ -46,18 +47,18 @@ const BAND_TONE: Record<string, Tone> = {
 
 /** The display strings VEGETATION_BLOCK_SPEC §4 prescribes, in both languages. */
 const BAND_LABEL: Record<string, string> = {
-  LOWER_TAIL: 'Noticeably below field average',
-  BELOW_TYPICAL: 'Slightly below field average',
-  TYPICAL: 'Typical for this field',
-  ABOVE_TYPICAL: 'Above field average',
+  LOWER_TAIL: msg('Noticeably below field average'),
+  BELOW_TYPICAL: msg('Slightly below field average'),
+  TYPICAL: msg('Typical for this field'),
+  ABOVE_TYPICAL: msg('Above field average'),
 };
 
 const BAND_COPY: Record<string, string> = {
   LOWER_TAIL:
-    'Noticeably less green than the rest of your field. Worth walking over to inspect.',
-  BELOW_TYPICAL: 'Slightly below typical field vigour.',
-  TYPICAL: 'In line with the rest of the field.',
-  ABOVE_TYPICAL: 'Among the greener, denser parts of the field.',
+    msg('Noticeably less green than the rest of your field. Worth walking over to inspect.'),
+  BELOW_TYPICAL: msg('Slightly below typical field vigour.'),
+  TYPICAL: msg('In line with the rest of the field.'),
+  ABOVE_TYPICAL: msg('Among the greener, denser parts of the field.'),
 };
 
 /**
@@ -68,10 +69,10 @@ const BAND_COPY: Record<string, string> = {
  * disagreement between them readable.
  */
 const INDEX_BLURB: Record<string, string> = {
-  VARI: 'Overall greenness, with some of the haze and lighting taken out.',
-  ExG: 'How strongly green wins over red and blue. Sensitive to how much leaf is in frame.',
-  TGI: 'Leans on the chlorophyll signal, so it tracks leaf colour more than leaf quantity.',
-  DGCI: 'How deep the green is, rather than how much of it there is.',
+  VARI: msg('Overall greenness, with some of the haze and lighting taken out.'),
+  ExG: msg('How strongly green wins over red and blue. Sensitive to how much leaf is in frame.'),
+  TGI: msg('Leans on the chlorophyll signal, so it tracks leaf colour more than leaf quantity.'),
+  DGCI: msg('How deep the green is, rather than how much of it there is.'),
 };
 
 function IndexRow({
@@ -94,18 +95,20 @@ function IndexRow({
         <Text style={[type.chipLabel, { color: color.fgSubtle, flex: 1 }]}>
           {label.toUpperCase()}
         </Text>
-        {band ? <StatusChip label={BAND_LABEL[band] ?? band.replace(/_/g, ' ')} tone={tone} /> : null}
+        {band ? (
+          <StatusChip label={BAND_LABEL[band] ? tr(BAND_LABEL[band]) : band.replace(/_/g, ' ')} tone={tone} />
+        ) : null}
       </View>
 
       <Text style={[type.small, { color: color.mutedForeground, marginTop: 2 }]}>
-        {INDEX_BLURB[label] ?? ''}
+        {INDEX_BLURB[label] ? tr(INDEX_BLURB[label]) : ''}
       </Text>
 
       {index.mean === null ? (
-        <Panel label="Withheld" tone="unknown">
+        <Panel label={tr('Withheld')} tone="unknown">
           {humaniseStatus(index.reason ?? undefined)}
           {typeof index.out_of_domain_fraction === 'number' && typeof index.threshold === 'number'
-            ? ` ${Math.round(index.out_of_domain_fraction * 100)}% of the canopy pixels were outside, against a limit of ${Math.round(index.threshold * 100)}%.`
+            ? ` ${tr('{p}% of the canopy pixels were outside, against a limit of {lim}%.', { p: Math.round(index.out_of_domain_fraction * 100), lim: Math.round(index.threshold * 100) })}`
             : ''}
         </Panel>
       ) : (
@@ -116,7 +119,7 @@ function IndexRow({
               <Text
                 style={[type.small, { color: color.mutedForeground, flex: 1, textAlign: 'right' }]}
               >
-                {BAND_COPY[band] ?? ''}
+                {BAND_COPY[band] ? tr(BAND_COPY[band]) : ''}
               </Text>
             ) : null}
           </View>
@@ -162,20 +165,19 @@ function OtherIndices({
   ];
   return (
     <View>
-      <Text style={[type.chipLabel, { color: color.fgSubtle }]}>OTHER COLOUR MEASURES</Text>
+      <Text style={[type.chipLabel, { color: color.fgSubtle }]}>{tr('OTHER COLOUR MEASURES')}</Text>
       <View style={s.cells}>
         {cells.map(([label, index]) => (
           <View key={label} style={{ flex: 1 }}>
             <Text style={[type.valueSmall, { color: color.fgSubtle }]}>{label}</Text>
             <Text style={[type.value, { color: index.mean === null ? color.unknown : color.foreground, fontSize: 16 }]}>
-              {index.mean === null ? 'withheld' : String(index.mean)}
+              {index.mean === null ? tr('withheld') : String(index.mean)}
             </Text>
           </View>
         ))}
       </View>
       <Text style={[type.small, { color: color.mutedForeground, marginTop: space.xs }]}>
-        For comparing scans over time. ExG tracks how much leaf is in frame, TGI the
-        chlorophyll signal, DGCI how deep the green is.
+        {tr('For comparing scans over time. ExG tracks how much leaf is in frame, TGI the chlorophyll signal, DGCI how deep the green is.')}
       </Text>
       {cells.some(([, i]) => i.mean === null) ? (
         <Text style={[type.small, { color: color.unknown, marginTop: space.xs }]}>
@@ -200,9 +202,9 @@ function CanopyRow({ canopy }: { canopy: CanopyCover }) {
   return (
     <View style={{ marginBottom: space.lg }}>
       <View style={s.head}>
-        <Text style={[type.chipLabel, { color: color.fgSubtle, flex: 1 }]}>GROUND COVERED</Text>
+        <Text style={[type.chipLabel, { color: color.fgSubtle, flex: 1 }]}>{tr('GROUND COVERED')}</Text>
         <StatusChip
-          label={low ? 'TOO LITTLE CROP' : 'ENOUGH TO MEASURE'}
+          label={low ? tr('TOO LITTLE CROP') : tr('ENOUGH TO MEASURE')}
           tone={low ? 'warn' : 'good'}
         />
       </View>
@@ -213,22 +215,22 @@ function CanopyRow({ canopy }: { canopy: CanopyCover }) {
         max={1}
         tone={low ? 'warn' : 'good'}
         bands={[
-          { upTo: floor, label: 'too little', tone: 'warn' },
-          { upTo: 1, label: 'measurable', tone: 'good' },
+          { upTo: floor, label: tr('too little'), tone: 'warn' },
+          { upTo: 1, label: tr('measurable'), tone: 'good' },
         ]}
-        markerLabel={`${Math.round(canopy.mean * 100)}% covered`}
-        caption={`The indices below need at least ${Math.round(floor * 100)}% of the frame to be canopy. Under that, soil colour dominates and the reading describes the ground instead of the crop.`}
+        markerLabel={tr('{p}% covered', { p: Math.round(canopy.mean * 100) })}
+        caption={tr('The indices below need at least {p}% of the frame to be canopy. Under that, soil colour dominates and the reading describes the ground instead of the crop.', { p: Math.round(floor * 100) })}
       />
 
       {low ? (
-        <Panel label="Indices withheld" tone="warn">
-          {`Canopy cover too low to measure vegetation indices (under ${Math.round(floor * 100)}%). Nothing was computed in their place. A number here would be about the soil, not the crop.`}
+        <Panel label={tr('Indices withheld')} tone="warn">
+          {tr('Canopy cover too low to measure vegetation indices (under {p}%). Nothing was computed in their place. A number here would be about the soil, not the crop.', { p: Math.round(floor * 100) })}
         </Panel>
       ) : null}
 
       {typeof canopy.p10 === 'number' && typeof canopy.p90 === 'number' ? (
         <Text style={[type.valueSmall, { color: color.fgSubtle, marginTop: space.sm }]}>
-          {`Across the scan: ${Math.round(canopy.p10 * 100)}% at the thinnest, ${Math.round(canopy.p90 * 100)}% at the densest.`}
+          {tr('Across the scan: {lo}% at the thinnest, {hi}% at the densest.', { lo: Math.round(canopy.p10 * 100), hi: Math.round(canopy.p90 * 100) })}
         </Text>
       ) : null}
     </View>
@@ -250,23 +252,23 @@ export function VegetationCard({ vegetation }: { vegetation: Vegetation }) {
 
   const lowCanopy = canopy?.status === 'INSUFFICIENT_CANOPY';
   const band = vegetation.vari?.mean !== null ? vegetation.vari?.band : null;
-  const cover = canopy ? `${Math.round(canopy.mean * 100)}% ground covered` : null;
+  const cover = canopy ? tr('{p}% ground covered', { p: Math.round(canopy.mean * 100) }) : null;
   const summary = lowCanopy
-    ? `Too little crop in frame${cover ? ` · ${cover}` : ''}`
-    : [band ? (BAND_LABEL[band] ?? band.replace(/_/g, ' ')) : null, cover]
+    ? [tr('Too little crop in frame'), cover].filter(Boolean).join(' · ')
+    : [band ? (BAND_LABEL[band] ? tr(BAND_LABEL[band]) : band.replace(/_/g, ' ')) : null, cover]
         .filter(Boolean)
-        .join(' · ') || 'Not measured';
+        .join(' · ') || tr('Not measured');
 
   return (
     <Card
-      eyebrow="Vegetation"
-      title="Greenness"
+      eyebrow={tr('Vegetation')}
+      title={tr('Greenness')}
       summary={summary}
       summaryTone={lowCanopy ? 'warn' : band ? (BAND_TONE[band] ?? 'neutral') : 'neutral'}
       // VEGETATION_BLOCK_SPEC §1.2: the caveat goes wherever a relative band
       // is shown — which includes this folded summary line, so it sits under
       // it rather than behind the tap.
-      note={relative && band ? VEGETATION_CAVEAT : undefined}
+      note={relative && band ? tr(VEGETATION_CAVEAT) : undefined}
       // The tile shows ground cover only. The relative greenness band needs
       // its caveat beside it (§1.2), and a tile has no room for both, so the
       // band lives one tap down, where the caveat panel opens first.
@@ -274,7 +276,7 @@ export function VegetationCard({ vegetation }: { vegetation: Vegetation }) {
         canopy
           ? {
               icon: <LeafIcon color={lowCanopy ? color.warningForeground : color.secondaryForeground} />,
-              label: 'GROUND COVER',
+              label: tr('GROUND COVER'),
               value: String(Math.round(canopy.mean * 100)),
               unit: '%',
               tone: lowCanopy ? 'warn' : 'good',
@@ -285,16 +287,17 @@ export function VegetationCard({ vegetation }: { vegetation: Vegetation }) {
                   tick={canopy.min_fraction_threshold}
                 />
               ),
-              caption: lowCanopy ? 'Too little crop in frame to measure greenness' : 'Crop in frame. Tap for greenness',
+              caption: lowCanopy
+                ? tr('Too little crop in frame to measure greenness')
+                : tr('Crop in frame. Tap for greenness'),
             }
-          : { icon: <LeafIcon color={color.unknown} />, label: 'GROUND COVER', value: 'Not measured', muted: true }
+          : { icon: <LeafIcon color={color.unknown} />, label: tr('GROUND COVER'), value: tr('Not measured'), muted: true }
       }
     >
       {/* VEGETATION_BLOCK_SPEC §1.2, verbatim, on the screen, first. */}
       {relative ? (
-        <Panel label="How to read this" tone="warn">
-          {VEGETATION_CAVEAT} A field that is evenly stressed still looks perfectly normal
-          here.
+        <Panel label={tr('How to read this')} tone="warn">
+          {tr(VEGETATION_CAVEAT)} {tr('A field that is evenly stressed still looks perfectly normal here.')}
         </Panel>
       ) : null}
 
@@ -317,8 +320,7 @@ export function VegetationCard({ vegetation }: { vegetation: Vegetation }) {
           happening in the presentation layer. */}
       {provisional ? (
         <Text style={[type.small, { color: color.warningForeground, marginTop: space.sm }]}>
-          The cut-offs here are our own working values for an uncalibrated camera, not yet
-          confirmed against a published source. The measurements are real.
+          {tr('The cut-offs here are our own working values for an uncalibrated camera, not yet confirmed against a published source. The measurements are real.')}
         </Text>
       ) : null}
 
@@ -329,11 +331,11 @@ export function VegetationCard({ vegetation }: { vegetation: Vegetation }) {
           estimated — and this is the *value*, not the camera probe, which is a
           different block on a different card. */}
       <Measurement
-        label="NDVI (infrared)"
+        label={tr('NDVI (infrared)')}
         value={vegetation.ndvi}
         status={vegetation.ndvi_status}
         reason={vegetation.ndvi_reason ?? undefined}
-        note="NDVI needs a second camera that sees infrared. Until that camera and its bench calibration are finished, this is left empty rather than guessed at from the colour image."
+        note={tr('NDVI needs a second camera that sees infrared. Until that camera and its bench calibration are finished, this is left empty rather than guessed at from the colour image.')}
       />
     </Card>
   );

@@ -19,6 +19,8 @@ import type { Filter } from '../../src/ui/count-tiles.tsx';
 import { ScanRow, isUnclear, looksHealthy, needsLook } from '../../src/ui/scan-row.tsx';
 import { useStatusBarStyle } from '../../src/ui/status-bar.ts';
 import { color, radius, space, type } from '../../src/ui/theme.ts';
+import { useLanguage } from '../../src/i18n/language.tsx';
+import { tr } from '../../src/i18n/tr.ts';
 
 const FILTERS: Record<Exclude<Filter, 'all'>, (r: AdvisorySummary) => boolean> = {
   look: needsLook,
@@ -33,6 +35,7 @@ export default function AllScansScreen() {
     params.filter && params.filter in FILTERS ? params.filter : 'all',
   );
   useStatusBarStyle('dark');
+  useLanguage();
 
   useFocusEffect(
     useCallback(() => {
@@ -53,18 +56,18 @@ export default function AllScansScreen() {
         <View style={s.listHead}>
           <Text style={[type.micro, { color: color.fgSubtle }]}>
             {filter === 'all'
-              ? `ALL ${rows.length} SCANS · NEWEST FIRST`
-              : `${shown.length} OF ${rows.length} SCANS`}
+              ? tr('ALL {n} SCANS · NEWEST FIRST', { n: rows.length })
+              : tr('{a} OF {n} SCANS', { a: shown.length, n: rows.length })}
           </Text>
           {filter !== 'all' ? (
             <Pressable onPress={() => setFilter('all')} accessibilityRole="button" hitSlop={8}>
-              <Text style={[type.label, { color: color.primary }]}>Show all</Text>
+              <Text style={[type.label, { color: color.primary }]}>{tr('Show all')}</Text>
             </Pressable>
           ) : null}
         </View>
       ) : (
         <View style={s.empty}>
-          <Muted>No scans yet. Pull from the pod on the Pod tab.</Muted>
+          <Muted>{tr('No scans yet. Pull from the pod on the Pod tab.')}</Muted>
         </View>
       )}
 

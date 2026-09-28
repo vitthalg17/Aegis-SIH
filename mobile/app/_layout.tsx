@@ -18,6 +18,9 @@ import { getDb } from '../src/db/client.ts';
 import { seedFixturesIfEmpty } from '../src/db/seed.ts';
 import { FieldsIcon, HomeIcon, PodIcon, ProfileIcon } from '../src/ui/tab-icons.tsx';
 import { color, font, type } from '../src/ui/theme.ts';
+import { LanguageProvider, loadSavedLanguage, useLanguage } from '../src/i18n/language.tsx';
+import type { AppLanguage } from '../src/i18n/tr.ts';
+import { tr } from '../src/i18n/tr.ts';
 
 export default function RootLayout() {
   const [fontsReady] = useFonts({
@@ -28,6 +31,7 @@ export default function RootLayout() {
     SourceCodePro_600SemiBold,
   });
   const [dbReady, setDbReady] = useState(false);
+  const [language, setLanguage] = useState<AppLanguage>('en');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -42,6 +46,9 @@ export default function RootLayout() {
         // verdict has to say so before any screen reads it.
         await seedFixturesIfEmpty();
         await revalidateAll();
+        // The farmer's language, before the first screen draws, so a Hindi
+        // reader never sees the app flash up in English.
+        setLanguage(await loadSavedLanguage());
         setDbReady(true);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
@@ -73,7 +80,9 @@ export default function RootLayout() {
       {/* No root <StatusBar>: it mounts after the first screen's focus effect
           and overwrote the light style the history band needs. Each screen
           sets its own with useStatusBarStyle. */}
-      <AppTabs />
+      <LanguageProvider initial={language}>
+        <AppTabs />
+      </LanguageProvider>
     </SafeAreaProvider>
   );
 }
@@ -86,6 +95,8 @@ export default function RootLayout() {
 function AppTabs() {
   // Inside SafeAreaProvider, so the inset is real.
   const insets = useSafeAreaInsets();
+  // Tab labels and headers follow the language.
+  useLanguage();
   return (
     <Tabs
       screenOptions={{
@@ -112,7 +123,7 @@ function AppTabs() {
       <Tabs.Screen
         name="(scans)"
         options={{
-          title: 'Home',
+          title: tr('Home'),
           headerShown: false,
           tabBarIcon: ({ color: c }) => <HomeIcon color={c} />,
         }}
@@ -120,26 +131,24 @@ function AppTabs() {
       <Tabs.Screen
         name="fields"
         options={{
-          title: 'Fields',
+          title: tr('Fields'),
           tabBarIcon: ({ color: c }) => <FieldsIcon color={c} />,
         }}
       />
       <Tabs.Screen
         name="sync"
         options={{
-          title: 'Pod',
-          headerTitle: 'Pod & sync',
+          title: tr('Pod'),
+          headerTitle: tr('Pod & sync'),
           tabBarIcon: ({ color: c }) => <PodIcon color={c} />,
         }}
       />
-      {/* Not built yet: the button shows but does nothing when pressed. */}
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: tr('Profile'),
           tabBarIcon: ({ color: c }) => <ProfileIcon color={c} />,
         }}
-        listeners={{ tabPress: (e) => e.preventDefault() }}
       />
     </Tabs>
   );

@@ -17,24 +17,28 @@ import { StatusChip, TONE } from './components.tsx';
 import type { Tone } from './components.tsx';
 import { formatWhen } from './advisory.tsx';
 import { color, radius, shadow, space, type } from './theme.ts';
+import { tr } from '../i18n/tr.ts';
 
 /** The one-line verdict for a row. Never "healthy" for a dried-leaf call. */
 export function rowVerdict(row: AdvisorySummary): { text: string; tone: Tone } {
   if (row.topClass === DRIED_LEAF_CLASS) {
-    return { text: 'Dried leaf, worth a look', tone: 'warn' };
+    return { text: tr('Dried leaf, worth a look'), tone: 'warn' };
   }
   const byState: Record<string, { text: string; tone: Tone }> = {
-    HEALTHY: { text: 'Looks healthy', tone: 'good' },
+    HEALTHY: { text: tr('Looks healthy'), tone: 'good' },
     DISEASE: {
-      text: row.topClass ? describeClass(row.topClass).condition : 'Something was found',
+      text: row.topClass ? describeClass(row.topClass).condition : tr('Something was found'),
       tone: 'bad',
     },
-    NOT_CROP: { text: 'Not crop', tone: 'unknown' },
-    UNCERTAIN: { text: 'Not clear enough to say', tone: 'warn' },
-    NO_DATA: { text: 'Nothing scanned', tone: 'unknown' },
+    NOT_CROP: { text: tr('Not crop'), tone: 'unknown' },
+    UNCERTAIN: { text: tr('Not clear enough to say'), tone: 'warn' },
+    NO_DATA: { text: tr('Nothing scanned'), tone: 'unknown' },
   };
   if (!row.state) {
-    return { text: row.fieldId ? `Field ${row.fieldId}` : `Scan ${row.seq ?? ''}`, tone: 'unknown' };
+    return {
+      text: row.fieldId ? tr('Field {id}', { id: row.fieldId }) : tr('Scan {n}', { n: row.seq ?? '' }),
+      tone: 'unknown',
+    };
   }
   return byState[row.state] ?? { text: String(row.state), tone: 'unknown' };
 }
@@ -66,7 +70,7 @@ function rowReliability(row: AdvisorySummary): string | null {
   if (row.state !== 'DISEASE' || !row.topClass) return null;
   const recall = recallPercent(row.topClass);
   if (recall === null) return null;
-  return `RIGHT ${recall} IN TESTS`;
+  return tr('RIGHT {pct} IN TESTS', { pct: recall });
 }
 
 export function ScanRow({ row, showField = true }: { row: AdvisorySummary; showField?: boolean }) {
@@ -78,16 +82,19 @@ export function ScanRow({ row, showField = true }: { row: AdvisorySummary; showF
   // DISEASE / HEALTHY chip under it was saying the same thing twice.
   const chips: { label: string; tone: Tone }[] = [];
   if (reliability) chips.push({ label: reliability, tone: 'bad' });
-  if (row.origin === 'fixture') chips.push({ label: 'SAMPLE', tone: 'neutral' });
-  if (row.origin === 'replay') chips.push({ label: 'REPLAY', tone: 'unknown' });
-  if (row.origin === 'imported') chips.push({ label: 'IMPORTED', tone: 'unknown' });
+  if (row.origin === 'fixture') chips.push({ label: tr('SAMPLE'), tone: 'neutral' });
+  if (row.origin === 'replay') chips.push({ label: tr('REPLAY'), tone: 'unknown' });
+  if (row.origin === 'imported') chips.push({ label: tr('IMPORTED'), tone: 'unknown' });
   // A production gateway never serves one of these, so a mock advisory on
   // this phone is worth flagging in the list rather than only on the record.
-  if (row.inferenceBackend === 'mock') chips.push({ label: 'SIMULATED MODEL', tone: 'bad' });
-  if (row.inferenceBackend === 'onnx') chips.push({ label: 'FALLBACK ENGINE', tone: 'warn' });
+  if (row.inferenceBackend === 'mock') chips.push({ label: tr('SIMULATED MODEL'), tone: 'bad' });
+  if (row.inferenceBackend === 'onnx') chips.push({ label: tr('FALLBACK ENGINE'), tone: 'warn' });
   if (!row.valid) {
     chips.push({
-      label: `${row.violationCount} SCHEMA VIOLATION${row.violationCount === 1 ? '' : 'S'}`,
+      label:
+        row.violationCount === 1
+          ? tr('1 SCHEMA VIOLATION')
+          : tr('{n} SCHEMA VIOLATIONS', { n: row.violationCount }),
       tone: 'bad',
     });
   }
@@ -116,7 +123,7 @@ export function ScanRow({ row, showField = true }: { row: AdvisorySummary; showF
               </View>
               <Text style={[type.small, { color: color.mutedForeground, marginTop: 2 }]}>
                 {formatWhen(row.generatedAtUtc)}
-                {showField && row.fieldId ? ` · Field ${row.fieldId}` : ''}
+                {showField && row.fieldId ? ` · ${tr('Field {id}', { id: row.fieldId })}` : ''}
               </Text>
               {chips.length > 0 ? (
                 <View style={s.chips}>

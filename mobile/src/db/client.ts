@@ -152,7 +152,9 @@ export type SyncKey =
    */
   | 'fixtures_version'
   /** Which schema generation the stored records were last validated against. */
-  | 'validated_against';
+  | 'validated_against'
+  /** The language the farmer picked on the Profile screen: 'en' or 'hi'. */
+  | 'app_language';
 
 export async function getState(key: SyncKey): Promise<string | null> {
   const db = await getDb();

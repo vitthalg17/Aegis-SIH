@@ -13,6 +13,7 @@ import { TONE } from './components.tsx';
 import type { Tone } from './components.tsx';
 import { isUnclear, looksHealthy, needsLook } from './scan-row.tsx';
 import { color, radius, shadow, space, type } from './theme.ts';
+import { tr } from '../i18n/tr.ts';
 
 export type Filter = 'all' | 'look' | 'healthy' | 'unclear';
 
@@ -28,9 +29,14 @@ export function CountTiles({
 }) {
   const look = rows.filter(needsLook).length;
   const tiles: { key: Exclude<Filter, 'all'>; value: number; label: string; tone: Tone }[] = [
-    { key: 'look', value: look, label: look === 1 ? 'needs a look' : 'need a look', tone: look > 0 ? 'bad' : 'good' },
-    { key: 'healthy', value: rows.filter(looksHealthy).length, label: 'healthy', tone: 'good' },
-    { key: 'unclear', value: rows.filter(isUnclear).length, label: 'unclear', tone: 'warn' },
+    {
+      key: 'look',
+      value: look,
+      label: look === 1 ? tr('needs a look') : tr('need a look'),
+      tone: look > 0 ? 'bad' : 'good',
+    },
+    { key: 'healthy', value: rows.filter(looksHealthy).length, label: tr('healthy'), tone: 'good' },
+    { key: 'unclear', value: rows.filter(isUnclear).length, label: tr('unclear'), tone: 'warn' },
   ];
 
   return (
@@ -44,7 +50,7 @@ export function CountTiles({
             onPress={() => onChange(on ? 'all' : t.key)}
             accessibilityRole="button"
             accessibilityState={{ selected: on }}
-            accessibilityHint={`Shows scans that are ${t.label}`}
+            accessibilityHint={tr('Shows scans that are {what}', { what: t.label })}
             style={({ pressed }) => [
               s.tile,
               on && { borderColor: c.fg, backgroundColor: c.bg },

@@ -32,6 +32,7 @@
  */
 
 import type { CrossSourceReliability } from './advisory.ts';
+import { tr } from '../i18n/tr.ts';
 
 export type TierInfo = {
   tier: CrossSourceReliability;
@@ -125,12 +126,17 @@ export const CONFIDENCE_CAVEAT =
  * build has not heard of must not arrive looking safer than the ones it has.
  */
 export function describeReliability(tier: CrossSourceReliability | undefined | null): TierInfo {
-  if (tier && TIERS[tier]) return TIERS[tier];
+  // Translated on the way out, so TIERS stays the registry's English.
+  if (tier && TIERS[tier]) {
+    const t = TIERS[tier];
+    return { ...t, label: tr(t.label), body: tr(t.body) };
+  }
   return {
     tier: tier ?? 'UNTESTED',
-    label: tier ? `UNRECOGNISED (${tier})` : 'NO RELIABILITY STATED',
-    body:
+    label: tier ? tr('UNRECOGNISED ({tier})', { tier }) : tr('NO RELIABILITY STATED'),
+    body: tr(
       'This finding did not state how well its class generalises to cameras the model has not seen, so nothing can be said about how much to trust it.',
+    ),
     severity: 4,
   };
 }

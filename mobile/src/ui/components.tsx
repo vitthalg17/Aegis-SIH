@@ -20,6 +20,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { color, font, radius, shadow, space, type } from './theme.ts';
 import type { SourceKind, VerificationStatus } from '../schema/advisory.ts';
 import { presentVerification } from '../schema/templates.ts';
+import { currentLanguage, tr } from '../i18n/tr.ts';
 import type { Language } from '../schema/templates.ts';
 
 // ---- Tones ----------------------------------------------------------------
@@ -336,7 +337,7 @@ export function Fold({
         onPress={() => setOpen((o) => !o)}
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
-        accessibilityHint={open ? 'Hides the details' : 'Shows the details'}
+        accessibilityHint={open ? tr('Hides the details') : tr('Shows the details')}
         style={({ pressed }) => [s.foldHead, pressed && { opacity: 0.6 }]}
       >
         <View style={{ flex: 1 }}>
@@ -529,11 +530,11 @@ export function NotMeasured({ status, reason }: { status?: string; reason?: stri
   return (
     <View style={[s.notMeasured, { borderColor: t.border, backgroundColor: t.bg }]}>
       <View style={s.notMeasuredHead}>
-        <Text style={[type.micro, { color: t.fg }]}>NOT MEASURED</Text>
+        <Text style={[type.micro, { color: t.fg }]}>{tr('NOT MEASURED')}</Text>
       </View>
       <Text style={[type.small, { color: t.fg, marginTop: 6 }]}>
         {unexplained
-          ? 'No status given. The advisory does not say why this is missing. Treat this record as untrustworthy.'
+          ? tr('No status given. The advisory does not say why this is missing. Treat this record as untrustworthy.')
           : humaniseStatus(status ?? reason)}
       </Text>
       {detail ? (
@@ -560,72 +561,74 @@ export function humaniseStatus(status?: string): string {
   switch (code) {
     // -- Thermal / CWSI ------------------------------------------------------
     case 'THERMAL_REFS_NOT_CONFIGURED':
-      return 'The thermal camera is working, but the wet and dry reference pads it measures against have not been set up. Canopy temperature is real; the stress index needs those pads and was not estimated without them.';
+      return tr('The thermal camera is working, but the wet and dry reference pads it measures against have not been set up. Canopy temperature is real; the stress index needs those pads and was not estimated without them.');
     case 'INSUFFICIENT_REFERENCE_GAP':
-      return 'The wet and dry reference pads were too close in temperature for the stress index to mean anything.';
+      return tr('The wet and dry reference pads were too close in temperature for the stress index to mean anything.');
     case 'WET_REF_VARIANCE_HIGH':
     case 'DRY_REF_VARIANCE_HIGH':
-      return 'One of the reference pads gave an unsteady reading, so the stress index was not worked out from it.';
+      return tr('One of the reference pads gave an unsteady reading, so the stress index was not worked out from it.');
     case 'HARDWARE_NOT_CONNECTED':
-      return 'The sensor this needs was not connected during the scan.';
+      return tr('The sensor this needs was not connected during the scan.');
     case 'REPLAY_THERMAL_NOT_OF_SCENE':
-      return 'This scan is a replay of a recorded video. The thermal camera was not pointed at the scene in the video, so its reading would describe somewhere else and was left out. The camera itself is fine.';
+      return tr('This scan is a replay of a recorded video. The thermal camera was not pointed at the scene in the video, so its reading would describe somewhere else and was left out. The camera itself is fine.');
 
     // -- NDVI ----------------------------------------------------------------
     case 'GATED_HARDWARE_CALIBRATION':
     case 'PENDING_HARDWARE_FINALIZATION':
-      return 'The second camera and its bench calibration have not landed yet. Nothing is estimated in their place.';
+      return tr('The second camera and its bench calibration have not landed yet. Nothing is estimated in their place.');
     case 'NOIR_CAMERA_NOT_DETECTED_ON_CSI_1':
-      return 'The infrared camera was not found on the pod.';
+      return tr('The infrared camera was not found on the pod.');
 
     // -- Satellite -----------------------------------------------------------
     case 'NO_SATELLITE_DATA_RECORDED':
-      return 'No satellite image has been downloaded for this field yet. That step needs an internet connection, which the pod does not have in the field.';
+      return tr('No satellite image has been downloaded for this field yet. That step needs an internet connection, which the pod does not have in the field.');
     case 'NO_CLEAR_SCENE':
-      return 'Every recent satellite pass over this field was under cloud.';
+      return tr('Every recent satellite pass over this field was under cloud.');
     case 'CREDENTIALS_MISSING':
-      return 'The satellite service login is not set up on the pod.';
+      return tr('The satellite service login is not set up on the pod.');
     case 'FIELD_CONFIG_MISSING':
     case 'FIELD_NOT_CONFIGURED':
-      return 'The boundary of this field has not been entered, so there is no area to read a satellite image over.';
+      return tr('The boundary of this field has not been entered, so there is no area to read a satellite image over.');
 
     // -- Irrigation ----------------------------------------------------------
     case 'INSUFFICIENT_TEMPERATURE_HISTORY':
-      return 'Not enough temperature readings came back from the field station in the last day to work out water use.';
+      return tr('Not enough temperature readings came back from the field station in the last day to work out water use.');
     case 'INSUFFICIENT_24H_HISTORY': {
       // "(need >=6 readings spanning >=6h in last 24h ..., found 26 readings
       // spanning 4.9h, ...)" — pull the two spans out; the rest stays as detail.
       const need = /need[^,]*?spanning\s*>=\s*([\d.]+)\s*h/.exec(status ?? '')?.[1];
       const found = /found[^,]*?spanning\s*([\d.]+)\s*h/.exec(status ?? '')?.[1];
       return (
-        `The field station needs ${need ? `at least ${need} hours` : 'more hours'} of readings from the last day to work this out.` +
-        (found ? ` It has ${found} hours so far.` : '')
+        (need
+          ? tr('The field station needs at least {h} hours of readings from the last day to work this out.', { h: need })
+          : tr('The field station needs more hours of readings from the last day to work this out.')) +
+        (found ? ` ${tr('It has {h} hours so far.', { h: found })}` : '')
       );
     }
 
     // -- Vegetation ----------------------------------------------------------
     case 'INSUFFICIENT_CANOPY_FRACTION':
-      return 'Too little of the frame was canopy. Below that point soil colour dominates and the reading would be about the ground, not the crop.';
+      return tr('Too little of the frame was canopy. Below that point soil colour dominates and the reading would be about the ground, not the crop.');
     case 'OUT_OF_DOMAIN_FRACTION_EXCEEDED':
-      return 'Too much of the frame fell outside the range of greens this measure is defined for, so the average would have described a minority of the pixels.';
+      return tr('Too much of the frame fell outside the range of greens this measure is defined for, so the average would have described a minority of the pixels.');
     case 'NO_FRAMES_ACCEPTED':
-      return 'No frame in this scan passed the checks needed to compute it.';
+      return tr('No frame in this scan passed the checks needed to compute it.');
 
     // -- Growth stage --------------------------------------------------------
     case 'DAYS_SINCE_PLANTING_REQUIRED':
     case 'AWAITING_PLANTING_DATE':
-      return 'The planting date has not been entered, so the crop stage cannot be worked out.';
+      return tr('The planting date has not been entered, so the crop stage cannot be worked out.');
     case 'CROP_NOT_SPECIFIED':
-      return 'The scan did not settle on one crop, so there is no crop calendar to place it against.';
+      return tr('The scan did not settle on one crop, so there is no crop calendar to place it against.');
     case 'UNSUPPORTED_CROP':
-      return 'There is no growth-stage table for this crop in the system.';
+      return tr('There is no growth-stage table for this crop in the system.');
 
     // -- Scan ----------------------------------------------------------------
     case 'GPS_TRACK_NOT_RECORDED':
-      return 'No satellite track was recorded during the walk, so the distance covered is not known.';
+      return tr('No satellite track was recorded during the walk, so the distance covered is not known.');
 
     default:
-      return status ?? 'Not available.';
+      return status ?? tr('Not available.');
   }
 }
 
@@ -639,55 +642,55 @@ export function shortStatus(status?: string | null): string {
   const code = (status ?? '').split(' (')[0];
   switch (code) {
     case 'THERMAL_REFS_NOT_CONFIGURED':
-      return 'Reference pads not set up';
+      return tr('Reference pads not set up');
     case 'INSUFFICIENT_REFERENCE_GAP':
     case 'WET_REF_VARIANCE_HIGH':
     case 'DRY_REF_VARIANCE_HIGH':
-      return 'Reference pads gave a bad reading';
+      return tr('Reference pads gave a bad reading');
     case 'HARDWARE_NOT_CONNECTED':
-      return 'Sensor not connected';
+      return tr('Sensor not connected');
     case 'REPLAY_THERMAL_NOT_OF_SCENE':
-      return 'Not used (replayed video)';
+      return tr('Not used (replayed video)');
     case 'GATED_HARDWARE_CALIBRATION':
     case 'PENDING_HARDWARE_FINALIZATION':
-      return 'Infrared camera not fitted yet';
+      return tr('Infrared camera not fitted yet');
     case 'NOIR_CAMERA_NOT_DETECTED_ON_CSI_1':
-      return 'Infrared camera not found';
+      return tr('Infrared camera not found');
     case 'NO_SATELLITE_DATA_RECORDED':
-      return 'No satellite image downloaded';
+      return tr('No satellite image downloaded');
     case 'NO_CLEAR_SCENE':
-      return 'Cloudy on every recent satellite pass';
+      return tr('Cloudy on every recent satellite pass');
     case 'CREDENTIALS_MISSING':
-      return 'Satellite login not set up';
+      return tr('Satellite login not set up');
     case 'FIELD_CONFIG_MISSING':
     case 'FIELD_NOT_CONFIGURED':
-      return 'Field boundary not entered';
+      return tr('Field boundary not entered');
     case 'INSUFFICIENT_TEMPERATURE_HISTORY':
-      return 'Field station needs more readings';
+      return tr('Field station needs more readings');
     case 'INSUFFICIENT_24H_HISTORY': {
       const need = /need[^,]*?spanning\s*>=\s*([\d.]+)\s*h/.exec(status ?? '')?.[1];
       const found = /found[^,]*?spanning\s*([\d.]+)\s*h/.exec(status ?? '')?.[1];
       return need && found
-        ? `Station has ${found} h of readings, needs ${need} h`
+        ? tr('Station has {f} h of readings, needs {n} h', { f: found, n: need })
         : 'Field station needs more hours of readings';
     }
     case 'INSUFFICIENT_CANOPY_FRACTION':
-      return 'Too little crop in the frame';
+      return tr('Too little crop in the frame');
     case 'OUT_OF_DOMAIN_FRACTION_EXCEEDED':
-      return 'Colours outside the measurable range';
+      return tr('Colours outside the measurable range');
     case 'NO_FRAMES_ACCEPTED':
-      return 'No usable frames';
+      return tr('No usable frames');
     case 'DAYS_SINCE_PLANTING_REQUIRED':
     case 'AWAITING_PLANTING_DATE':
-      return 'Planting date not entered';
+      return tr('Planting date not entered');
     case 'CROP_NOT_SPECIFIED':
-      return 'Scan saw more than one crop';
+      return tr('Scan saw more than one crop');
     case 'UNSUPPORTED_CROP':
-      return 'No stage table for this crop';
+      return tr('No stage table for this crop');
     case 'GPS_TRACK_NOT_RECORDED':
-      return 'No GPS track recorded';
+      return tr('No GPS track recorded');
     default:
-      return 'Not available';
+      return tr('Not available');
   }
 }
 
@@ -716,7 +719,13 @@ export function statusDetail(status?: string): string | null {
 export function SourceTag({ source }: { source: SourceKind }) {
   const tone: Tone =
     source === 'measured' ? 'good' : source === 'provisional' ? 'warn' : 'neutral';
-  return <StatusChip label={String(source).replace(/_/g, ' ').toUpperCase()} tone={tone} />;
+  const label =
+    source === 'measured'
+      ? tr('MEASURED')
+      : source === 'provisional'
+        ? tr('PROVISIONAL')
+        : String(source).replace(/_/g, ' ').toUpperCase();
+  return <StatusChip label={label} tone={tone} />;
 }
 
 // ---- Verification ---------------------------------------------------------
@@ -733,7 +742,7 @@ export function SourceTag({ source }: { source: SourceKind }) {
  */
 export function VerificationBadge({
   status,
-  language = 'en',
+  language = currentLanguage(),
   /** Set false on a dense list where the full note would repeat every row. */
   showNote = true,
 }: {
@@ -748,7 +757,7 @@ export function VerificationBadge({
       <StatusChip label={p.badge} tone={tone} />
       {showNote || p.mandatory ? (
         <View style={{ marginTop: -space.sm }}>
-          <Panel label={p.mandatory ? 'Read this first' : 'Where this comes from'} tone={tone}>
+          <Panel label={p.mandatory ? tr('Read this first') : tr('Where this comes from')} tone={tone}>
             {p.note}
           </Panel>
         </View>
