@@ -29,12 +29,15 @@
  * a system whose entire claim is that it needs no cloud at any point.
  */
 
-import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Card, Chip, ChipRow, Divider, Muted, Panel, SourceTag, StatusChip } from './components.tsx';
+import { Card, Muted, Panel, SourceTag, StatusChip } from './components.tsx';
 import type { Tone } from './components.tsx';
 import { FieldMap, MapLegend, Stat } from './charts.tsx';
 import type { MapPoint } from './charts.tsx';
+import { FIX_RADIUS_M, SatelliteMap } from './satellite-map.tsx';
+import type { GeoPoint } from './satellite-map.tsx';
 import {
   describeSpread,
   extentMetres,
@@ -47,9 +50,7 @@ import type { Advisory, CrossSourceReliability, Detection } from '../schema/advi
 import { describeClass } from '../schema/classes.ts';
 import {
   CONFIDENCE_CAVEAT,
-  MACRO_F1,
   describeReliability,
-  needsProminentCaveat,
   recallPercent,
 } from '../schema/reliability.ts';
 
@@ -65,56 +66,56 @@ const TIER_TONE: Record<string, Tone> = {
   UNTESTED: 'unknown',
 };
 
-/** The reliability chip and, when it matters, its full panel. */
-function Reliability({
-  tier,
-  className,
-  confidence,
-}: {
-  tier: CrossSourceReliability;
+/**
+ * The trust label a farmer reads on each finding.
+ *
+ * Shorter than the registry's tier labels so it fits on the row beside the
+ * name, and phrased as how often the call is right — which is the question
+ * being asked. The full tier sentence is one tap down, in the row's detail.
+ */
+const TRUST_LABEL: Record<string, string> = {
+  TESTED_ROBUST: 'USUALLY RIGHT',
+  TESTED_WEAK: 'OFTEN WRONG',
+  TESTED_FAILED: 'RARELY RIGHT',
+  UNTESTED: 'UNTESTED',
+};
+
+/** How many findings show before "Show more". */
+const FOLD_AFTER = 3;
+
+type Finding = {
   className: string;
   confidence: number;
-}) {
-  const info = describeReliability(tier);
-  const tone = TIER_TONE[String(tier)] ?? 'bad';
-  const recall = recallPercent(className);
-  const prominent = needsProminentCaveat(tier, confidence);
-
-  return (
-    <View style={{ marginTop: space.sm }}>
-      <StatusChip label={info.label} tone={tone} />
-      {prominent ? (
-        <View style={{ marginTop: -space.sm }}>
-          <Panel label="How much to trust this" tone={tone}>
-            {info.body}
-            {recall
-              ? ` On the independent test set this class was recognised correctly ${recall} of the time.`
-              : ''}
-          </Panel>
-        </View>
-      ) : null}
-    </View>
-  );
-}
+  frames: number;
+  tier: CrossSourceReliability | undefined;
+  source: Advisory['disease'][number]['source'];
+};
 
 /**
- * Findings across the whole scan.
+ * Findings across the whole scan, one row each.
  *
  * `disease[]` in contract v1.0 is thin — class, confidence, empty media list —
- * so the per-class evidence a reader needs comes from joining it against
- * `detections[]`, which is where the reliability tier and the repeat count
- * actually live. That join happens here rather than being faked with numbers
- * `disease[]` does not carry.
+ * so the per-class evidence comes from joining it against `detections[]`,
+ * which is where the reliability tier and the repeat count live.
+ *
+ * ── What a row shows, and why the confidence is not on it ───────────────────
+ * The row leads with the trust label, then the frame count. The model's
+ * confidence is only in the row's detail, underneath the tier explanation.
+ * High confidence is exactly the state in which a reader stops reading
+ * caveats, and on this model it is close to unrelated to being right — so a
+ * folded row no longer shows it at all, rather than showing it beside a
+ * warning. TESTED_FAILED rows carry their warning on the row itself, unfolded.
  */
 export function DiseaseCard({ advisory }: { advisory: Advisory }) {
+  const [showAll, setShowAll] = useState(false);
   const disease = advisory.disease ?? [];
   const detections = advisory.detections ?? [];
 
   if (disease.length === 0) {
     return (
-      <Card eyebrow="Findings" title="What the camera called">
+      <Card title="What the camera found">
         <Muted>
-          Nothing was flagged in this scan. See the verdict above for what that means — an
+          Nothing was flagged in this scan. See the verdict above for what that means. An
           empty list here is not the same as a clean bill of health.
         </Muted>
       </Card>
@@ -131,96 +132,155 @@ export function DiseaseCard({ advisory }: { advisory: Advisory }) {
     if (!seen || d.confidence > seen.confidence) byClass.set(d.class, d);
   }
 
-  // Strongest first. The pod orders these, but not by contract, and the
-  // reliability caveats read worst when the order is arbitrary.
-  const ordered = [...byClass.values()].sort((a, b) => b.confidence - a.confidence);
-
-  return (
-    <Card eyebrow="Findings" title="What the camera called">
-      {/* One standing caveat for the whole card, above every figure on it. */}
-      <Panel label="Before you read the numbers" tone="warn">
-        {CONFIDENCE_CAVEAT}
-      </Panel>
-
-      {ordered.map((d, i) => {
-        const described = describeClass(d.class);
-        const hits = detections.filter((x) => x.class === d.class);
+  const findings: Finding[] = [...byClass.values()]
+    // Strongest first. The pod orders these, but not by contract.
+    .sort((a, b) => b.confidence - a.confidence)
+    .map((d) => {
+      const hits = detections.filter((x) => x.class === d.class);
+      return {
+        className: d.class,
+        confidence: d.confidence,
+        frames: hits.length,
         // The tier is a property of the class, so any detection of it carries
         // the same one. Taking the first is not a sample, it is a lookup.
-        const tier = hits[0]?.cross_source_reliability;
-        const recall = recallPercent(d.class);
+        tier: hits[0]?.cross_source_reliability,
+        source: d.source,
+      };
+    });
 
-        return (
-          <View key={`${d.class}-${i}`} style={{ marginTop: space.lg }}>
-            {i > 0 ? <Divider /> : null}
+  const shown = showAll ? findings : findings.slice(0, FOLD_AFTER);
+  const hidden = findings.length - shown.length;
+  const photosPruned = disease.every((d) => Array.isArray(d.media_ids) && d.media_ids.length === 0);
 
-            <View style={s.head}>
-              <View style={{ flex: 1 }}>
-                <Text style={[type.cardTitle, { color: color.foreground }]}>
-                  {described.condition}
-                </Text>
-                <Text style={[type.valueSmall, { color: color.fgSubtle, marginTop: 3 }]}>
-                  {described.crop ?? d.class}
-                  {i === 0 && ordered.length > 1 ? ' · strongest' : ''}
-                </Text>
-              </View>
-              <SourceTag source={d.source} />
-            </View>
+  return (
+    <Card
+      title="What the camera found"
+      right={<Text style={[type.chipValue, { color: color.fgSubtle }]}>{findings.length}</Text>}
+    >
+      {/* One standing line for the whole card, above every row. */}
+      <Text style={[type.small, { color: color.warningForeground, marginBottom: space.xs }]}>
+        Check every finding by eye before treating. Tap one for the details.
+      </Text>
 
-            {/* Tier first, deliberately. It is the thing that decides what the
-                confidence underneath it is worth. */}
-            {tier ? (
-              <Reliability tier={tier} className={d.class} confidence={d.confidence} />
-            ) : (
-              <Panel label="No reliability stated" tone="bad">
-                This finding did not say how well its class holds up on cameras the model
-                has not seen, so there is no way to judge the figure below.
-              </Panel>
-            )}
+      {shown.map((f, i) => (
+        <FindingRow key={f.className} finding={f} strongest={i === 0 && findings.length > 1} />
+      ))}
 
-            <View style={s.statRow}>
-              <Stat
-                value={String(hits.length)}
-                caption={hits.length === 1 ? 'Frame it appeared in' : 'Frames it appeared in'}
-                tone={hits.length > 2 ? 'bad' : 'neutral'}
-              />
-              <Stat value={d.confidence.toFixed(2)} caption="Model certainty" />
-              <Stat
-                value={recall ?? 'untested'}
-                caption="Correct on unseen cameras"
-                tone={recall ? 'warn' : 'unknown'}
-              />
-            </View>
+      {hidden > 0 || showAll ? (
+        <Pressable
+          onPress={() => setShowAll((v) => !v)}
+          accessibilityRole="button"
+          style={({ pressed }) => [s.more, pressed && { opacity: 0.6 }]}
+        >
+          <Text style={[type.label, { color: color.primary }]}>
+            {showAll ? 'Show fewer' : `Show ${hidden} more`}
+          </Text>
+        </Pressable>
+      ) : null}
 
-            <ChipRow>
-              <Chip value="CONFIRM BY EYE" tone="warn" />
-              {/* Contract: media_ids is always present and always empty, because
-                  the pod prunes images to save storage. Saying so beats a
-                  broken thumbnail or a silent absence. */}
-              {Array.isArray(d.media_ids) && d.media_ids.length === 0 ? (
-                <Chip label="PHOTO" value="NOT KEPT" tone="unknown" />
-              ) : null}
-            </ChipRow>
-
-            {/* Seen once and never again is the weakest shape this evidence
-                takes, and it is worth naming rather than leaving the reader to
-                infer it from a count of one. */}
-            {hits.length === 1 ? (
-              <Text style={[type.small, { color: color.mutedForeground, marginTop: space.sm }]}>
-                Seen in a single frame. A real lesion usually shows up in several as you
-                walk past it, so this one is worth a second look before acting.
-              </Text>
-            ) : null}
-          </View>
-        );
-      })}
-
-      <Panel label="How this model was measured" tone="unknown">
-        {`Across all classes the model gets about ${Math.round(MACRO_F1.heldOut * 100)}% right on photographs from cameras it never trained on, against about ${Math.round(MACRO_F1.inDistribution * 100)}% on the ones it did. It partly learned which dataset a photo came from rather than what is wrong with the plant. That gap is why every finding here says to confirm by eye.`}
-      </Panel>
+      {/* The standing confidence caveat, from its constant, once per card.
+          Every confidence figure on this card sits inside a row's detail,
+          below this. */}
+      <Text style={[type.small, { color: color.fgSubtle, marginTop: space.sm }]}>
+        {CONFIDENCE_CAVEAT}
+        {/* Contract: media_ids is always present and always empty, because the
+            pod prunes images to save storage. Said once, not per row. */}
+        {photosPruned ? ' Photos are not kept on the pod.' : ''}
+      </Text>
     </Card>
   );
 }
+
+function FindingRow({ finding: f, strongest }: { finding: Finding; strongest: boolean }) {
+  const [open, setOpen] = useState(false);
+  const described = describeClass(f.className);
+  const info = describeReliability(f.tier);
+  const tone = f.tier ? (TIER_TONE[String(f.tier)] ?? 'bad') : 'bad';
+  const trust = f.tier ? (TRUST_LABEL[String(f.tier)] ?? info.label) : 'NO TRUST DATA';
+  const recall = recallPercent(f.className);
+
+  return (
+    <View style={s.findingRow}>
+      <Pressable
+        onPress={() => setOpen((o) => !o)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        style={({ pressed }) => [s.findingHead, pressed && { opacity: 0.6 }]}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={[type.label, { color: color.foreground, fontFamily: type.cardTitle.fontFamily }]}>
+            {described.condition}
+          </Text>
+          <Text style={[type.small, { color: color.mutedForeground, marginTop: 2 }]}>
+            {[
+              described.crop ?? f.className,
+              `${f.frames} frame${f.frames === 1 ? '' : 's'}`,
+              strongest ? 'strongest' : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </Text>
+        </View>
+        <StatusChip label={trust} tone={tone} />
+        <Text style={[type.chipValue, { color: color.fgSubtle, fontSize: 16 }]}>
+          {open ? '−' : '+'}
+        </Text>
+      </Pressable>
+
+      {/* A class that fails on unseen cameras carries its warning on the row,
+          folded or not. */}
+      {f.tier === 'TESTED_FAILED' && !open ? (
+        <Text style={[type.small, { color: color.destructive, marginTop: -2, marginBottom: space.sm }]}>
+          {`Right ${recall ?? 'almost none'} of the time in tests on new cameras. A prompt to look, not a diagnosis.`}
+        </Text>
+      ) : null}
+
+      {open ? (
+        <View style={{ paddingBottom: space.md }}>
+          {/* Tier first, deliberately. It decides what the confidence under it
+              is worth. */}
+          <Panel label="How much to trust this" tone={tone}>
+            {info.body}
+            {recall
+              ? ` On the independent test set this class was recognised correctly ${recall} of the time.`
+              : ''}
+          </Panel>
+
+          <View style={s.statRow}>
+            <Stat
+              value={String(f.frames)}
+              caption={f.frames === 1 ? 'Frame it appeared in' : 'Frames it appeared in'}
+              tone={f.frames > 2 ? 'bad' : 'neutral'}
+            />
+            <Stat value={f.confidence.toFixed(2)} caption="Model certainty" />
+            {/* "?" rather than "untested" in a third-width column, where the
+                word was cut to "untes…"; the caption carries the meaning. */}
+            <Stat
+              value={recall ?? '?'}
+              caption={recall ? 'Right on new cameras' : 'Never tested on new cameras'}
+              tone={recall ? 'warn' : 'unknown'}
+            />
+          </View>
+
+          {/* Seen once and never again is the weakest shape this evidence
+              takes, and it is worth naming rather than leaving the reader to
+              infer it from a count of one. */}
+          {f.frames === 1 ? (
+            <Text style={[type.small, { color: color.mutedForeground, marginTop: space.sm }]}>
+              Seen in a single frame. A real lesion usually shows up in several as you walk
+              past it, so this one is worth a second look.
+            </Text>
+          ) : null}
+
+          <View style={{ marginTop: space.sm, alignSelf: 'flex-start' }}>
+            <SourceTag source={f.source} />
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 
 /**
  * The clustering verdict in words a farmer can act on.
@@ -230,7 +290,7 @@ export function DiseaseCard({ advisory }: { advisory: Advisory }) {
  */
 const SPREAD_COPY: Record<string, (m: number) => string> = {
   Clustered: (m) =>
-    `The findings sit close together — about ${m} m apart on average. Start where they are densest.`,
+    `The findings sit close together, about ${m} m apart on average. Start where they are densest.`,
   'Loosely grouped': (m) => `The findings are somewhat grouped, about ${m} m apart on average.`,
   'Spread out': (m) =>
     `The findings are scattered across the area you scanned, roughly ${m} m apart on average, rather than concentrated in one place.`,
@@ -244,7 +304,7 @@ export function DetectionsCard({ advisory }: { advisory: Advisory }) {
 
   if (detections.length === 0) {
     return (
-      <Card eyebrow="Where" title="Field map">
+      <Card eyebrow="Where" title="Where in the field" summary="Nothing to place on a map">
         <Muted>
           {gps?.status === 'ABSENT'
             ? 'No satellite fix during this scan, and nothing was flagged to place on a map.'
@@ -256,11 +316,16 @@ export function DetectionsCard({ advisory }: { advisory: Advisory }) {
 
   if (located.length === 0) {
     return (
-      <Card eyebrow="Where" title="Field map">
+      <Card
+        eyebrow="Where"
+        title="Where in the field"
+        summary={`No GPS positions for ${detections.length} finding${detections.length === 1 ? '' : 's'}`}
+        summaryTone="unknown"
+      >
         <Panel label="No positions" tone="unknown">
           {detections.length} detection{detections.length === 1 ? '' : 's'} were made but none
           could be positioned
-          {gps?.status === 'ABSENT' ? ' — the pod never got a satellite fix' : ''}. The findings
+          {gps?.status === 'ABSENT' ? ' because the pod never got a satellite fix' : ''}. The findings
           are still real; only their locations are missing.
         </Panel>
         <Muted>
@@ -289,7 +354,6 @@ export function DetectionsCard({ advisory }: { advisory: Advisory }) {
 
   const scaleM = pickScaleMetres(span);
   const spread = describeSpread(metres, span);
-  const best = located.reduce((a, b) => (b.confidence > a.confidence ? b : a));
   // Worst-case tier across everything on this map, so the plot cannot look
   // more authoritative than its least reliable mark.
   const worstTier = located
@@ -303,76 +367,78 @@ export function DetectionsCard({ advisory }: { advisory: Advisory }) {
     null,
   );
 
+  // Healthy-class detections (a positive "this is healthy rice" call) are on
+  // the map too, in green: where the pod looked and found nothing wrong is part
+  // of the picture. Everything else is something to walk over and look at.
+  const toneOf = (c: string): Tone =>
+    describeClass(c).category === 'healthy' ? 'good' : 'bad';
+
+  const geo: GeoPoint[] = located.map((d) => ({
+    lat: d.lat,
+    lon: d.lon,
+    tone: toneOf(d.class),
+    label: describeClass(d.class).condition,
+    sub: `${describeClass(d.class).crop ?? ''}${d.captured_utc ? ` · ${new Date(d.captured_utc).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}` : ''}`,
+  }));
+
+  const gpsLine = [
+    gps?.point_count !== undefined ? `${gps.point_count} GPS fixes` : null,
+    dgps > 0 ? `${dgps} of ${fixes.length} differential` : null,
+    worstHdop !== null ? `worst spread ${worstHdop.toFixed(1)}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
-    <Card eyebrow="Where" title="Field map">
-      {/* The reading, in words, above the plot. */}
+    <Card eyebrow="Where" title="Where in the field">
+      {/* The reading, in words, above the map. */}
       {spread ? (
         <View style={s.verdictRow}>
-          <Text style={[type.cardTitle, { color: color.foreground }]}>{spread.verdict}</Text>
-          <Text style={[type.small, { color: color.mutedForeground, marginTop: 4 }]}>
+          <Text style={[type.label, { color: color.foreground }]}>{spread.verdict}</Text>
+          <Text style={[type.small, { color: color.mutedForeground, marginTop: 2 }]}>
             {SPREAD_COPY[spread.verdict](Math.round(spread.meanSeparationM))}
           </Text>
         </View>
       ) : null}
 
-      <View style={s.plotWrap}>
-        <FieldMap points={points} scaleLabel={`${scaleM} m`} scaleFraction={scaleM / span} />
-      </View>
+      <SatelliteMap
+        points={geo}
+        fallback={
+          <View style={s.plotWrap}>
+            <FieldMap points={points} scaleLabel={`${scaleM} m`} scaleFraction={scaleM / span} />
+          </View>
+        }
+      />
 
       <MapLegend
         items={[
-          {
-            label: `${describeClass(classes[0]).condition} · larger = more confident`,
-            tone: 'bad',
-          },
+          ...classes.map((c) => ({ label: describeClass(c).condition, tone: toneOf(c) })),
         ]}
       />
 
-      <View style={s.statRow}>
-        <Stat value={String(located.length)} caption="Placed on the map" tone="bad" />
-        <Stat value={`${Math.round(span)} m`} caption="Across the scanned area" />
-        <Stat value={best.confidence.toFixed(2)} caption="Strongest mark" />
-      </View>
+      {/* The caveat is the point. Without it the map over-promises. */}
+      <Text style={[type.small, { color: color.warningForeground, marginTop: space.sm }]}>
+        {`Each circle is about ${FIX_RADIUS_M} m across the GPS error, so it marks a patch of the field, not one plant. Use it to find the area, then look around it.`}
+      </Text>
 
       {/* A map is persuasive in a way a list is not, so the reliability of what
           is on it travels with it rather than living only on the card above. */}
-      <Panel label="How much to trust the marks" tone={TIER_TONE[String(worstTier.tier)] ?? 'bad'}>
-        {worstTier.body}
-      </Panel>
-
-      <ChipRow>
-        {classes.slice(1).map((c) => (
-          <Chip key={c} label="ALSO" value={describeClass(c).condition} tone="warn" />
-        ))}
-        {unlocated > 0 ? <Chip label="NO POSITION" value={String(unlocated)} tone="warn" /> : null}
-        {gps?.point_count !== undefined ? (
-          <Chip label="GPS FIXES" value={String(gps.point_count)} />
-        ) : null}
-        {dgps > 0 ? <Chip label="DIFFERENTIAL" value={`${dgps}/${fixes.length}`} tone="good" /> : null}
-        {worstHdop !== null ? (
-          <Chip
-            label="WORST SPREAD"
-            value={worstHdop.toFixed(1)}
-            tone={worstHdop > 2 ? 'warn' : 'neutral'}
-          />
-        ) : null}
-      </ChipRow>
-
-      {/* The caveat is the point. Without it this plot over-promises. */}
-      <Panel label="How precise this is" tone="warn">
-        {gps?.accuracy_note ??
-          'Point tagging only, roughly 2.5 m. This locates a corner of a field, not a plant.'}{' '}
-        Use it to see whether findings cluster in one part of the field, not to walk to an
-        exact spot. There is no background map because nothing here is accurate enough to
-        sit on one.
-      </Panel>
+      {worstTier.severity >= 2 ? (
+        <Panel label="How much to trust the marks" tone={TIER_TONE[String(worstTier.tier)] ?? 'bad'}>
+          {worstTier.body}
+        </Panel>
+      ) : null}
 
       {unlocated > 0 ? (
-        <Panel label="Missing positions" tone="unknown">
-          {unlocated} detection{unlocated === 1 ? '' : 's'} could not be positioned and
-          {unlocated === 1 ? ' is' : ' are'} not on this plot. The finding is real even where
-          the position is not.
-        </Panel>
+        <Text style={[type.small, { color: color.unknown, marginTop: space.sm }]}>
+          {`${unlocated} more finding${unlocated === 1 ? ' has' : 's have'} no position and ${unlocated === 1 ? 'is' : 'are'} not on the map. The finding is real even where the position is not.`}
+        </Text>
+      ) : null}
+
+      {gpsLine ? (
+        <Text style={[type.valueSmall, { color: color.fgSubtle, marginTop: space.sm }]}>
+          {gpsLine}
+        </Text>
       ) : null}
     </Card>
   );
@@ -383,4 +449,12 @@ const s = StyleSheet.create({
   verdictRow: { marginBottom: space.md },
   plotWrap: { alignItems: 'center', paddingVertical: space.sm },
   statRow: { flexDirection: 'row', gap: space.md, marginTop: space.lg },
+  findingRow: { borderTopWidth: 1, borderTopColor: color.border },
+  findingHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    paddingVertical: space.md,
+  },
+  more: { paddingVertical: space.sm, alignSelf: 'flex-start' },
 });

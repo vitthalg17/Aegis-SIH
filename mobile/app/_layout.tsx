@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Tabs } from 'expo-router/js-tabs';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   useFonts,
   Montserrat_400Regular,
@@ -17,7 +16,8 @@ import {
 import { revalidateAll } from '../src/db/advisories.ts';
 import { getDb } from '../src/db/client.ts';
 import { seedFixturesIfEmpty } from '../src/db/seed.ts';
-import { color, type } from '../src/ui/theme.ts';
+import { FieldsIcon, HomeIcon, PodIcon, ProfileIcon } from '../src/ui/tab-icons.tsx';
+import { color, font, type } from '../src/ui/theme.ts';
 
 export default function RootLayout() {
   const [fontsReady] = useFonts({
@@ -70,24 +70,77 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <Stack
-        screenOptions={{
-          headerStyle: { backgroundColor: color.background },
-          headerShadowVisible: false,
-          headerTintColor: color.foreground,
-          // The stack header only accepts fontFamily/fontSize/fontWeight/color,
-          // so the tracking from the type ramp cannot be applied here.
-          headerTitleStyle: { fontFamily: 'Montserrat_700Bold', fontSize: 16.5 },
-          contentStyle: { backgroundColor: color.background },
-        }}
-      >
-        {/* The history screen draws its own inverted header band, matching
-            the site's deep sections, so the stack header is turned off there. */}
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="advisory/[id]" options={{ title: 'Advisory' }} />
-        <Stack.Screen name="sync" options={{ title: 'Field station', presentation: 'modal' }} />
-      </Stack>
+      {/* No root <StatusBar>: it mounts after the first screen's focus effect
+          and overwrote the light style the history band needs. Each screen
+          sets its own with useStatusBarStyle. */}
+      <AppTabs />
     </SafeAreaProvider>
+  );
+}
+
+/**
+ * Three places, always one tap away: home (the scans), the fields they came from,
+ * and the pod they are pulled from. The bar stays visible on an open advisory
+ * too — see (scans)/_layout.tsx.
+ */
+function AppTabs() {
+  // Inside SafeAreaProvider, so the inset is real.
+  const insets = useSafeAreaInsets();
+  return (
+    <Tabs
+      screenOptions={{
+        tabBarActiveTintColor: color.primary,
+        tabBarInactiveTintColor: color.fgSubtle,
+        // Sized explicitly: with Montserrat the default bar clipped the bottom
+        // of its labels. Setting a height means adding the gesture-bar inset
+        // by hand, which the default would otherwise have done.
+        tabBarStyle: {
+          backgroundColor: color.card,
+          borderTopColor: color.border,
+          height: 70 + insets.bottom,
+          paddingTop: 6,
+          paddingBottom: 6 + insets.bottom,
+        },
+        tabBarLabelStyle: { fontFamily: font.sansMedium, fontSize: 11.5, lineHeight: 15 },
+        headerStyle: { backgroundColor: color.background },
+        headerShadowVisible: false,
+        headerTintColor: color.foreground,
+        headerTitleStyle: { fontFamily: font.sansBold, fontSize: 16.5 },
+        sceneStyle: { backgroundColor: color.background },
+      }}
+    >
+      <Tabs.Screen
+        name="(scans)"
+        options={{
+          title: 'Home',
+          headerShown: false,
+          tabBarIcon: ({ color: c }) => <HomeIcon color={c} />,
+        }}
+      />
+      <Tabs.Screen
+        name="fields"
+        options={{
+          title: 'Fields',
+          tabBarIcon: ({ color: c }) => <FieldsIcon color={c} />,
+        }}
+      />
+      <Tabs.Screen
+        name="sync"
+        options={{
+          title: 'Pod',
+          headerTitle: 'Pod & sync',
+          tabBarIcon: ({ color: c }) => <PodIcon color={c} />,
+        }}
+      />
+      {/* Not built yet: the button shows but does nothing when pressed. */}
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color: c }) => <ProfileIcon color={c} />,
+        }}
+        listeners={{ tabPress: (e) => e.preventDefault() }}
+      />
+    </Tabs>
   );
 }

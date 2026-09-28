@@ -146,7 +146,7 @@ const ENTRIES: TemplateEntry[] = [
       action:
         'Collect a fresh leaf sample showing typical symptoms in a clean paper bag and present it to your nearest Krishi Vigyan Kendra (KVK) or Block Agriculture Extension Officer.',
       rationale:
-        'Symptom pattern requires microscopic or laboratory pathogen confirmation before chemical intervention. Citation: Procedural fallback — no published chemical or dose cited.',
+        'Symptom pattern requires microscopic or laboratory pathogen confirmation before chemical intervention. Citation: Procedural fallback: no published chemical or dose cited.',
     },
     hi: {
       action:
@@ -196,7 +196,7 @@ const ENTRIES: TemplateEntry[] = [
       action:
         'Apply foliar spray of Mancozeb 75% WP @ 2.5–3.0 g/L (500–600 g in 200 L water per acre) or combi-fungicide Mancozeb 63% + Carbendazim 12% WP @ 2.5 g/L. Supplement with top-dressing of Muriate of Potash (MOP) @ 10 kg/acre if soil potassium is deficient.',
       rationale:
-        'Brown spot is aggravated by nutritional stress (specifically potassium and silicon deficiency) in light or drought-prone soils. Citation: Recalled from memory — ICAR-NRRI Cuttack advisory; document unverified offline.',
+        'Brown spot is aggravated by nutritional stress (specifically potassium and silicon deficiency) in light or drought-prone soils. Citation: Recalled from memory: ICAR-NRRI Cuttack advisory; document unverified offline.',
     },
     hi: {
       action:
@@ -276,7 +276,7 @@ const ENTRIES: TemplateEntry[] = [
       action:
         'Avoid standing water stagnation. Avoid unverified over-the-counter chemical sprays. Consult your local Krishi Vigyan Kendra (KVK) officer for verified local treatment guidance.',
       rationale:
-        'Explicitly unsourced — ICAR chemical registration unverified for this class. No published chemical or dose is cited.',
+        'Explicitly unsourced: ICAR chemical registration unverified for this class. No published chemical or dose is cited.',
     },
     hi: {
       action:
@@ -294,7 +294,7 @@ const ENTRIES: TemplateEntry[] = [
       action:
         'Foliar chemical spraying on standing infected crop is INEFFECTIVE. Immediately uproot and burn wilted clumps along with entire root mass. Disinfect the planting spot with Carbendazim 0.1% (1 g/L). Do NOT take a ratoon crop from this infected field. Plant certified disease-free setts in next cycle.',
       rationale:
-        'Colletotrichum falcatum is an internal vascular pathogen colonizing the nodal and internodal pith; surface foliar fungicides cannot penetrate vascular bundles once internal red lesions and white cross-bands develop. Citation: Recalled from memory — ICAR-SBI Publication 214 unverified against physical text.',
+        'Colletotrichum falcatum is an internal vascular pathogen colonizing the nodal and internodal pith; surface foliar fungicides cannot penetrate vascular bundles once internal red lesions and white cross-bands develop. Citation: Recalled from memory: ICAR-SBI Publication 214 unverified against physical text.',
     },
     hi: {
       action:
@@ -310,7 +310,7 @@ const ENTRIES: TemplateEntry[] = [
       action:
         'Carefully envelope the characteristic black whip structure in a polythene bag, cut at the base, and burn outside the field to prevent teliospore dissemination. Spray Triadimefon 25% WP @ 1.0 g/L (200 g in 200 L water per acre) or Propiconazole 25% EC @ 1.0 ml/L to protect adjacent uninfected canes.',
       rationale:
-        'Smut whips release billions of wind-dispersed teliospores. Enclosing in polythene before excision prevents massive spore showers onto neighboring clumps. Citation: Recalled from memory — ICAR-IISR Bulletin 49 unverified against physical text.',
+        'Smut whips release billions of wind-dispersed teliospores. Enclosing in polythene before excision prevents massive spore showers onto neighboring clumps. Citation: Recalled from memory: ICAR-IISR Bulletin 49 unverified against physical text.',
     },
     hi: {
       action:
@@ -326,7 +326,7 @@ const ENTRIES: TemplateEntry[] = [
       action:
         'Apply foliar spray of Copper Oxychloride 50% WP @ 2.5 g/L (500 g in 200 L water per acre) or Carbendazim 50% WP @ 1.0 g/L (200 g in 200 L water per acre) directed into the central leaf whorl. Repeat after 15 days if top rot symptoms persist.',
       rationale:
-        'Air-borne conidia infect young spindle leaves during monsoon humidity. Direct whorl drenching halts progression from chlorotic wrinkle phase into top rot and knife-cut phases. Citation: Recalled from memory — ICAR-SBI Advisory unverified against physical text.',
+        'Air-borne conidia infect young spindle leaves during monsoon humidity. Direct whorl drenching halts progression from chlorotic wrinkle phase into top rot and knife-cut phases. Citation: Recalled from memory: ICAR-SBI Advisory unverified against physical text.',
     },
     hi: {
       action:
@@ -342,7 +342,7 @@ const ENTRIES: TemplateEntry[] = [
       action:
         'Spray Mancozeb 75% WP @ 2.0 g/L (400 g in 200 L water per acre) or Propiconazole 25% EC @ 1.0 ml/L (200 ml in 200 L water per acre) upon emergence of orange-brown elongated pustules on lower leaf surfaces.',
       rationale:
-        'Ergosterol biosynthesis inhibitor halts urediniospore germination and pustule expansion during periods of high relative humidity (>80%). Citation: Recalled from memory — ICAR-IISR pp. 31–33 unverified against physical text.',
+        'Ergosterol biosynthesis inhibitor halts urediniospore germination and pustule expansion during periods of high relative humidity (>80%). Citation: Recalled from memory: ICAR-IISR pp. 31–33 unverified against physical text.',
     },
     hi: {
       action:
@@ -362,7 +362,7 @@ const ENTRIES: TemplateEntry[] = [
     },
     hi: {
       action:
-        'कोई कवकनाशी या जीवाणुनाशी दवा न छिड़कें — विषाणु, फाइटोप्लाज़्मा या मौसम से हुए लक्षण दवा से ठीक नहीं होते। तेज़ मोज़ेक या घास जैसी बढ़वार वाले झुंडों को उखाड़ दें। खाद संतुलित मात्रा में दें।',
+        'कोई कवकनाशी या जीवाणुनाशी दवा न छिड़कें। विषाणु, फाइटोप्लाज़्मा या मौसम से हुए लक्षण दवा से ठीक नहीं होते। तेज़ मोज़ेक या घास जैसी बढ़वार वाले झुंडों को उखाड़ दें। खाद संतुलित मात्रा में दें।',
       rationale:
         'विषाणु जनित रोग पूरे पौधे में फैल जाते हैं और छिड़काव से ठीक नहीं होते। पट्टीदार पीलापन ठंड या मौसम बदलने की प्रतिक्रिया है और अपने आप ठीक हो जाता है। सन्दर्भ: DPPQS एवं NIPHM, गन्ना हेतु AESA आधारित IPM पैकेज, पृष्ठ 29 व 32।',
     },

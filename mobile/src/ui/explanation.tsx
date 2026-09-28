@@ -89,8 +89,13 @@ export function ExplanationCard({ advisory }: { advisory: Advisory }) {
     setState({ phase: 'error', reason: result.reason });
   }, [advisory, language]);
 
+  // No endpoint on this build and nothing cached: there is nothing this card
+  // could ever show, and the screen is complete without it. Saying "not
+  // configured" at a farmer took a whole card to tell them nothing.
+  if (state.phase === 'absent' && !isConfigured()) return null;
+
   return (
-    <View style={{ marginBottom: space.lg }}>
+    <View>
       <Card
         eyebrow="Generated · not a measurement"
         title="In plain language"
@@ -102,11 +107,8 @@ export function ExplanationCard({ advisory }: { advisory: Advisory }) {
             { color: color.mutedForeground, marginBottom: space.md },
           ]}
         >
-          Written by a language model from the advisory above, over the internet —
-          there is no model on this phone. Every figure in it is checked against that
-          advisory before it is shown, and the whole explanation is thrown away if one
-          does not match. The advice itself comes from the readings, not from the
-          model.
+          Written by AI from the readings above. Every figure is checked against them, and
+          the advice itself comes from the readings, not the AI.
         </Text>
 
         <LanguagePicker value={language} onChange={setLanguage} />
@@ -169,7 +171,7 @@ function Body({ state, onGenerate }: { state: State; onGenerate: () => void }) {
       return isConfigured() ? (
         <>
           <Text style={[type.small, { color: color.mutedForeground, marginBottom: space.sm }]}>
-            Not generated yet. This step needs an internet connection — the advisory
+            Not generated yet. This step needs an internet connection. The advisory
             above does not.
           </Text>
           <GenerateButton onPress={onGenerate} label="Explain this advisory" />

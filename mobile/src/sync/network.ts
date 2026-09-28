@@ -88,7 +88,7 @@ export function explainNetworkFailure(err: unknown, url: string): string {
   if (isLocal && timedOut && Platform.OS === 'android') {
     return (
       'Timed out reaching the pod. On Android this usually means the ' +
-      'request went out over mobile data instead of the WiFi you joined — the ' +
+      'request went out over mobile data instead of the WiFi you joined. The ' +
       'network has no internet, so Android keeps the default route on cellular. ' +
       'Turning mobile data off is a workaround; the fix is the network binding ' +
       'described in src/sync/network.ts.'

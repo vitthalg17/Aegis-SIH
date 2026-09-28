@@ -135,7 +135,7 @@ export function validateAdvisory(raw: unknown): ValidationResult {
     add(1, 'replay', 'advisory does not declare whether it is a live scan or a replay');
   }
   if (typeof a.seq !== 'number') {
-    add(1, 'seq', 'advisory carries no seq — it cannot be ordered against the others');
+    add(1, 'seq', 'advisory carries no seq; it cannot be ordered against the others');
   }
   // Which engine ran the model. Its absence means a silent CPU fallback cannot
   // be distinguished from a TensorRT run, which is the thing the field exists
@@ -170,12 +170,12 @@ export function validateAdvisory(raw: unknown): ValidationResult {
       add(1, 'scan.distance_walked_m', 'distance is null with no reason given');
     }
   } else {
-    add(1, 'scan', 'scan block missing — an advisory must say what produced it');
+    add(1, 'scan', 'scan block missing; an advisory must say what produced it');
   }
 
   const health = a.crop_health;
   if (!isObject(health)) {
-    add(1, 'crop_health', 'crop_health block missing — an empty disease[] is ambiguous without it');
+    add(1, 'crop_health', 'crop_health block missing; an empty disease[] is ambiguous without it');
   } else if (health.state !== 'HEALTHY' && health.state !== 'DISEASE' && !health.reason) {
     // HEALTHY and DISEASE are definitive verdicts and need no reason. Every
     // other state is the pod declining to call it, and declining without
@@ -187,7 +187,7 @@ export function validateAdvisory(raw: unknown): ValidationResult {
   for (const key of AVAILABILITY_BLOCKS) {
     const block = (a as unknown as Record<string, unknown>)[key];
     if (!isObject(block)) {
-      add(1, key, `${key} block missing — the app cannot tell unavailable from unreported`);
+      add(1, key, `${key} block missing; the app cannot tell unavailable from unreported`);
       continue;
     }
     if (typeof block.available !== 'boolean') {
@@ -230,14 +230,14 @@ export function validateAdvisory(raw: unknown): ValidationResult {
 
     const canopy = veg.canopy_cover;
     if (!isObject(canopy)) {
-      add(1, 'vegetation.canopy_cover', 'canopy_cover block missing — the indices below it are ungated');
+      add(1, 'vegetation.canopy_cover', 'canopy_cover block missing; the indices below it are ungated');
     } else if (typeof canopy.min_fraction_threshold !== 'number') {
       // The contract says 0.10 and the block spec says 0.15. Neither may be
       // assumed by the renderer, so the payload has to carry it.
       add(
         1,
         'vegetation.canopy_cover.min_fraction_threshold',
-        'canopy gate threshold missing — the app must not assume 0.10 or 0.15',
+        'canopy gate threshold missing; the app must not assume 0.10 or 0.15',
       );
     }
 
@@ -327,7 +327,7 @@ export function validateAdvisory(raw: unknown): ValidationResult {
 
   const inputs = Array.isArray(a.inputs) ? a.inputs : null;
   if (!inputs) {
-    add(3, 'inputs', 'inputs[] is missing — the advisory does not declare what it was built from');
+    add(3, 'inputs', 'inputs[] is missing; the advisory does not declare what it was built from');
   } else {
     if (inputs.length === 0) {
       add(3, 'inputs', 'inputs[] is empty');
@@ -429,7 +429,7 @@ export function validateAdvisory(raw: unknown): ValidationResult {
         add(1, `actions[${i}].advisory_only`, 'action does not declare itself advisory-only');
       }
       if (!act.template_id) {
-        add(1, `actions[${i}].template_id`, 'action has no template_id — it cannot be translated offline');
+        add(1, `actions[${i}].template_id`, 'action has no template_id; it cannot be translated offline');
       } else if (!(TEMPLATE_IDS as readonly string[]).includes(act.template_id)) {
         // Not fatal to rendering — the English still shows — but it means the
         // Hindi view has nothing to render from, which is worth surfacing.

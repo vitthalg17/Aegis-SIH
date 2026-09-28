@@ -13,7 +13,8 @@
  * with its own words, not as a blank, a dash, or a zero.
  */
 
-import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
   Card,
@@ -25,11 +26,12 @@ import {
   Row,
   StatusChip,
   TONE,
-  VerificationBadge,
   humaniseStatus,
+  shortStatus,
 } from './components.tsx';
 import type { Tone } from './components.tsx';
 import { EvidenceBar, Meter, Stat } from './charts.tsx';
+import { ProgressBar, SproutIcon } from './tiles.tsx';
 import { color, radius, shadow, space, type } from './theme.ts';
 import type {
   Advisory,
@@ -40,7 +42,7 @@ import type {
   InputStatus,
 } from '../schema/advisory.ts';
 import { DRIED_LEAF_CAVEAT, DRIED_LEAF_CLASS, describeClass } from '../schema/classes.ts';
-import { renderAction } from '../schema/templates.ts';
+import { presentVerification, renderAction } from '../schema/templates.ts';
 import type { Language } from '../schema/templates.ts';
 import type { AdvisoryOrigin } from '../db/advisories.ts';
 import type { Violation } from '../schema/validate.ts';
@@ -60,20 +62,24 @@ import { describeViolation } from '../schema/validate.ts';
 export function OriginBanner({ origin }: { origin: AdvisoryOrigin }) {
   if (origin === 'synced') return null;
 
+  // One line each. The banner still leads the screen, but it no longer takes a
+  // paragraph to say "this is a replay".
   const copy: Record<Exclude<AdvisoryOrigin, 'synced'>, { label: string; body: string; tone: Tone }> = {
     fixture: {
-      label: 'SAMPLE DATA · NOT A MEASUREMENT',
-      body: 'These values were invented to exercise the app. No sensor produced them.',
+      // True of all six shipped samples, including the one real device
+      // capture among them: none came from this farmer's pod.
+      label: 'SAMPLE DATA',
+      body: 'Built into the app for testing. Not from your pod or your field.',
       tone: 'warn',
     },
     replay: {
-      label: 'REPLAY · NOT A LIVE SCAN',
-      body: 'Assembled from a recorded video file rather than captured during this scan. Real model output on real footage, but not a reading taken just now. A live walk reports this as false.',
+      label: 'REPLAY',
+      body: 'Real model output on a recorded video, not a live scan.',
       tone: 'unknown',
     },
     imported: {
-      label: 'IMPORTED FILE · NOT PULLED FROM A POD',
-      body: 'Loaded from a file on this phone rather than synced over the field link. Check it came from the pod you think it did.',
+      label: 'IMPORTED FILE',
+      body: 'Loaded from a file, not pulled from a pod. Check where it came from.',
       tone: 'unknown',
     },
   };
@@ -81,9 +87,9 @@ export function OriginBanner({ origin }: { origin: AdvisoryOrigin }) {
   const c = copy[origin];
   const t = TONE[c.tone];
   return (
-    <View style={[s.banner, { borderColor: t.border, backgroundColor: t.bg }]}>
+    <View style={[s.banner, s.bannerRow, { borderColor: t.border, backgroundColor: t.bg }]}>
       <Text style={[type.micro, { color: t.fg }]}>{c.label}</Text>
-      <Text style={[type.small, { color: t.fg, marginTop: 5 }]}>{c.body}</Text>
+      <Text style={[type.small, { color: t.fg, flex: 1 }]}>{c.body}</Text>
     </View>
   );
 }
@@ -116,7 +122,7 @@ export function BackendBanner({ advisory }: { advisory: Advisory }) {
       <Text style={[type.small, { color: t.fg, marginTop: 5 }]}>
         {mock
           ? 'This advisory was produced by the simulated inference backend, not by the model running on the device. A pod in normal operation refuses to hand these out at all. Nothing here is a reading of a real plant.'
-          : 'The classifier ran on the processor rather than the graphics engine it is meant to use. The findings are from the same model, but the pod did not start up the way it should have — worth mentioning to whoever maintains it.'}
+          : 'Same model, but the pod did not start up normally. Worth telling whoever maintains it.'}
       </Text>
     </View>
   );
@@ -165,23 +171,20 @@ const HEALTH_HEADLINE: Record<string, string> = {
 
 const HEALTH_BODY: Record<string, string> = {
   HEALTHY:
-    'The classifier made a positive, confident call that this is a healthy crop. That is a stronger statement than "we found nothing wrong".',
-  DISEASE: 'The classifier found a condition it recognises. Confirm it by eye before treating anything.',
-  NOT_CROP:
-    'Most of what the camera saw was not crop — soil, a hand, a path. Nothing was diagnosed because there was nothing to diagnose.',
-  UNCERTAIN:
-    'The frames disagreed with each other. Rather than pick a winner from a weak field, the pod declined to call it.',
+    'The model positively recognised healthy crop. That is a stronger call than "nothing found".',
+  DISEASE: 'Check it by eye before treating anything.',
+  NOT_CROP: 'Mostly soil, path or hands, so there was nothing to diagnose.',
+  UNCERTAIN: 'The frames disagreed, so the pod did not pick an answer.',
   NO_DATA: 'No frames were evaluated in this scan.',
 };
 
 /** The reasons the aggregator gives for declining to call a verdict. */
 const HEALTH_REASON_COPY: Record<string, string> = {
   MULTIPLE_CROPS_DETECTED:
-    'The camera saw more than one kind of crop and no single one reached the four-in-five majority the pod needs before it will name a crop. Check whether you walked across a boundary or through an intercropped strip — and treat the findings below as belonging to several different crops, not one.',
-  HIGH_UNCERTAINTY:
-    'The frames disagreed with each other too much for any one answer to stand out.',
+    'The camera saw more than one crop. Did you cross a field edge or an intercropped strip? The findings below may belong to different crops.',
+  HIGH_UNCERTAINTY: 'The frames disagreed too much for one answer to stand out.',
   UNCONFIRMED_DETECTIONS:
-    'Something was seen, but never twice in a row. The pod needs at least two agreeing frames before it will call a finding, so this was left uncalled.',
+    'Something was seen, but never in two frames in a row, so it was not called.',
 };
 
 /**
@@ -205,7 +208,6 @@ export function CropHealthCard({
   const described = topClass ? describeClass(topClass) : null;
 
   const total = health.frames_evaluated;
-  const rejected = health.frames_rejected_ood + health.frames_rejected_not_crop;
   const other = Math.max(0, total - health.frames_agreeing - health.frames_uncertain);
 
   return (
@@ -213,38 +215,29 @@ export function CropHealthCard({
       {/* The band carries the state colour; the words carry the state. Never
           one without the other — this has to read in sun and in grayscale. */}
       <View style={[s.verdictBand, { backgroundColor: t.bg, borderBottomColor: t.border }]}>
-        <Text style={[type.micro, { color: t.fg }]}>VERDICT</Text>
-        <Text style={[type.title, { color: t.fg, marginTop: 6 }]}>
+        <Text style={[type.title, { color: t.fg }]}>
           {HEALTH_HEADLINE[health.state] ?? String(health.state)}
         </Text>
         {described ? (
-          <Text style={[type.small, { color: t.fg, marginTop: 4, opacity: 0.9 }]}>
-            {described.label}
-          </Text>
+          <Text style={[type.label, { color: t.fg, marginTop: 4 }]}>{described.label}</Text>
         ) : health.crop ? (
-          <Text style={[type.small, { color: t.fg, marginTop: 4, opacity: 0.9 }]}>
+          <Text style={[type.label, { color: t.fg, marginTop: 4 }]}>
             {health.crop.charAt(0).toUpperCase() + health.crop.slice(1)}
           </Text>
         ) : null}
+        <Text style={[type.small, { color: t.fg, marginTop: 6, opacity: 0.9 }]}>
+          {HEALTH_BODY[health.state] ?? ''}
+        </Text>
       </View>
 
-      <View style={{ padding: space.lg }}>
-        {/* The hero figure: how much of the evidence agreed. One per screen.
-            This leads rather than the confidence because held-out accuracy is
-            far below in-distribution accuracy — agreement across frames is the
-            more honest signal of the two. */}
+      <View style={{ paddingHorizontal: space.lg, paddingVertical: space.md }}>
+        {/* How much of the evidence agreed. This leads rather than the
+            confidence because held-out accuracy is far below in-distribution
+            accuracy — agreement across frames is the more honest signal. */}
         {total > 0 ? (
-          <View style={s.heroRow}>
-            <Text style={[type.hero, { color: t.fg }]}>{health.frames_agreeing}</Text>
-            <View style={{ flex: 1, paddingBottom: 6 }}>
-              <Text style={[type.label, { color: color.foreground }]}>
-                of {total} frames agreed
-              </Text>
-              <Text style={[type.small, { color: color.mutedForeground, marginTop: 2 }]}>
-                Each frame is judged on its own, then they vote.
-              </Text>
-            </View>
-          </View>
+          <Text style={[type.label, { color: color.foreground }]}>
+            {`${health.frames_agreeing} of ${total} frames agreed`}
+          </Text>
         ) : null}
 
         {total > 0 ? (
@@ -257,10 +250,6 @@ export function CropHealthCard({
           />
         ) : null}
 
-        <Text style={[type.small, { color: color.mutedForeground, marginTop: space.md }]}>
-          {HEALTH_BODY[health.state] ?? ''}
-        </Text>
-
         {/* The model groups dried leaf with the healthy classes, which is right
             for the model and wrong for the farmer. Never "your sugarcane is
             healthy" when what was detected is dried leaves. */}
@@ -271,22 +260,13 @@ export function CropHealthCard({
         ) : null}
 
         {health.reason ? (
-          <Panel label="Why it could not be called" tone="warn">
+          <Panel label="Heads up" tone="warn">
             {HEALTH_REASON_COPY[health.reason] ?? humaniseStatus(health.reason)}
           </Panel>
         ) : null}
 
-        {/* Thrown-away frames are a separate count from the vote, because they
-            never entered it. Reporting them inside the bar would make the
-            denominator mean two things at once. */}
-        {rejected > 0 ? (
-          <Text style={[type.small, { color: color.mutedForeground, marginTop: space.sm }]}>
-            Separately, {health.frames_rejected_not_crop} frame
-            {health.frames_rejected_not_crop === 1 ? ' was' : 's were'} not crop and{' '}
-            {health.frames_rejected_ood} did not look like anything the model was trained
-            on. Both were thrown away before the vote rather than forced into a class.
-          </Text>
-        ) : null}
+        {/* Frames thrown away before the vote are reported under Scan details:
+            they never entered the vote, so they do not belong beside it. */}
       </View>
     </View>
   );
@@ -322,8 +302,41 @@ export function GrowthStageCard({ stage }: { stage: GrowthStage }) {
   const canopy = stage.canopy_cover_measured;
   const expected = stage.canopy_cover_expected_range;
 
+  const summary = known
+    ? `${STAGE_LABEL[stage.stage ?? ''] ?? String(stage.stage)}${
+        typeof days === 'number' ? ` · day ${days}${typeof cycle === 'number' ? ` of ~${cycle}` : ''}` : ''
+      }${cycleFromFarmer ? '' : ' · variety assumed'}`
+    : `Not worked out: ${shortStatus(stage.reason ?? stage.status).toLowerCase()}`;
+
   return (
-    <Card eyebrow="Season" title="Where the crop is">
+    <Card
+      eyebrow="Season"
+      title="Crop stage"
+      summary={summary}
+      summaryTone={known ? 'neutral' : 'unknown'}
+      tile={
+        known && typeof days === 'number'
+          ? {
+              icon: <SproutIcon color={color.secondaryForeground} />,
+              label: 'CROP STAGE',
+              value: `Day ${days}`,
+              visual:
+                typeof cycle === 'number' && cycle > 0 ? (
+                  <ProgressBar fraction={days / cycle} tone="good" />
+                ) : undefined,
+              caption: `${STAGE_LABEL[stage.stage ?? ''] ?? String(stage.stage)}${
+                typeof cycle === 'number' ? ` · of ~${cycle} days` : ''
+              }${cycleFromFarmer ? '' : ' · variety assumed'}`,
+            }
+          : {
+              icon: <SproutIcon color={color.unknown} />,
+              label: 'CROP STAGE',
+              value: known ? (STAGE_LABEL[stage.stage ?? ''] ?? 'Known') : 'Not known',
+              muted: !known,
+              caption: known ? undefined : shortStatus(stage.reason ?? stage.status),
+            }
+      }
+    >
       {!known ? (
         <Panel label="Stage not worked out" tone="unknown">
           {humaniseStatus(stage.reason ?? stage.status)}
@@ -410,6 +423,23 @@ const INPUT_LABEL: Record<string, string> = {
   mast_trap: 'Sticky trap camera',
 };
 
+/** The same sensors, short enough to list in one folded line. */
+const INPUT_SHORT: Record<string, string> = {
+  pod_thermal: 'Thermal',
+  pod_gps: 'GPS',
+  pod_camera_rgb: 'Camera',
+  pod_ndvi: 'Infrared',
+  mast_ambient: 'Air sensor',
+  mast_soil: 'Soil probes',
+  mast_trap: 'Trap camera',
+};
+
+const INPUT_STATUS_SHORT: Record<string, string> = {
+  PENDING_CALIBRATION: 'needs calibration',
+  MOCK_PROVISIONAL: 'simulated',
+  ABSENT: 'not connected',
+};
+
 const INPUT_STATUS_TONE: Record<string, Tone> = {
   OK: 'good',
   PENDING_CALIBRATION: 'warn',
@@ -483,7 +513,12 @@ export function InputsCard({
 }) {
   if (!inputs || inputs.length === 0) {
     return (
-      <Card eyebrow="Provenance" title="What this was built from">
+      <Card
+        eyebrow="Provenance"
+        title="Sensors used"
+        summary="None declared, so nothing shows what was measured"
+        summaryTone="bad"
+      >
         <Panel label="Nothing declared" tone="bad">
           This advisory does not list the sensors it came from, so there is no way to
           tell which of its numbers were measured and which were not.
@@ -492,8 +527,30 @@ export function InputsCard({
     );
   }
 
+  // Folded: how many sensors fed this scan, and what is up with the rest.
+  // PENDING_CALIBRATION is not "not used" — its direct reading is real and on
+  // this screen — so it is named for what it is rather than lumped in.
+  const working = inputs.filter((x) => x.status === 'OK' && !isReplayThermal(x, thermalReason));
+  const notWorking = inputs
+    .filter((x) => !working.includes(x))
+    .map((x) => {
+      const name = INPUT_SHORT[x.name] ?? x.name.replace(/_/g, ' ');
+      if (isReplayThermal(x, thermalReason)) return `${name} not used (replay)`;
+      return `${name} ${INPUT_STATUS_SHORT[String(x.status)] ?? String(x.status).toLowerCase()}`;
+    });
+  const anySimulated = inputs.some((x) => x.status === 'MOCK_PROVISIONAL');
+
   return (
-    <Card eyebrow="Provenance" title="What this was built from">
+    <Card
+      eyebrow="Provenance"
+      title="Sensors used"
+      summary={
+        notWorking.length === 0
+          ? `All ${inputs.length} working`
+          : `${working.length} of ${inputs.length} fully working · ${notWorking.join(' · ')}`
+      }
+      summaryTone={anySimulated ? 'bad' : notWorking.length > 0 ? 'unknown' : 'good'}
+    >
       {inputs.map((input, i) => {
         const status = input.status as InputStatus;
         const replayThermal = isReplayThermal(input, thermalReason);
@@ -516,10 +573,11 @@ export function InputsCard({
               </View>
               <StatusChip label={label} tone={tone} />
             </Row>
+            {/* The chip already names the state; the body only explains it. */}
             {body ? (
-              <Panel label={label} tone={tone}>
+              <Text style={[type.small, { color: TONE[tone].fg, marginBottom: space.xs }]}>
                 {body}
-              </Panel>
+              </Text>
             ) : null}
           </View>
         );
@@ -531,6 +589,7 @@ export function InputsCard({
 // ---- Actions --------------------------------------------------------------
 
 const CONFIDENCE_TONE: Record<string, Tone> = { high: 'good', medium: 'neutral', low: 'warn' };
+const CONFIDENCE_HI: Record<string, string> = { high: 'उच्च', medium: 'मध्यम', low: 'कम' };
 
 /**
  * The pod's recommended actions — the product.
@@ -548,117 +607,237 @@ const CONFIDENCE_TONE: Record<string, Tone> = { high: 'good', medium: 'neutral',
  *   The verification badge renders from the structural enum, so switching to
  *   Hindi cannot drop it — which is the failure mode §1.2 exists to prevent.
  *
- *   RECALLED_UNVERIFIED carries its caution panel unconditionally. There is no
- *   prop on `VerificationBadge` that suppresses it.
+ *   A mandatory verification note (RECALLED_UNVERIFIED, or a status this build
+ *   does not recognise) is always open, above the reasoning. Only the ordinary
+ *   provenance notes fold behind "Why?".
  */
 export function ActionsCard({
   actions,
   language = 'en',
+  onLanguageChange,
 }: {
   actions: Advisory['actions'];
   language?: Language;
+  onLanguageChange?: (l: Language) => void;
 }) {
+  const toggle = onLanguageChange ? (
+    <LanguageToggle value={language} onChange={onLanguageChange} />
+  ) : undefined;
+
   if (!actions || actions.length === 0) {
     return (
-      <Card eyebrow="Advisory" title="What to do">
+      <Card title={language === 'hi' ? 'क्या करें' : 'What to do'} right={toggle}>
         <Muted>No actions in this advisory.</Muted>
       </Card>
     );
   }
 
   return (
-    <Card eyebrow="Advisory" title={language === 'hi' ? 'क्या करें' : 'What to do'}>
-      {actions.map((a, i) => {
-        const r = renderAction(a, language);
-        return (
-          <View key={`${a.rank}-${a.template_id}`} style={{ marginTop: i === 0 ? 0 : space.lg }}>
-            {i > 0 ? <Divider /> : null}
-            <View style={s.head}>
-              <View style={s.rank}>
-                <Text style={[type.chipLabel, { color: color.primaryForeground }]}>{a.rank}</Text>
-              </View>
-              <Text style={[type.label, { color: color.foreground, flex: 1 }]}>{r.action}</Text>
-            </View>
+    <Card title={language === 'hi' ? 'क्या करें' : 'What to do'} right={toggle}>
+      {actions.map((a, i) => (
+        <ActionRow
+          key={`${a.rank}-${a.template_id}`}
+          action={a}
+          language={language}
+          first={i === 0}
+        />
+      ))}
 
-            {/* Mandatory, structural, and above the reasoning rather than
-                below it — a caution a reader reaches after the dose is a
-                caution they read after deciding. */}
-            <VerificationBadge status={a.verification_status} language={language} />
-
-            {r.rationale ? (
-              <Panel label={language === 'hi' ? 'क्यों' : 'Why'} tone="neutral">
-                {r.rationale}
-              </Panel>
-            ) : null}
-
-            {/* The retrievable source, for anyone who wants to check. Shown as
-                text rather than a link: this phone is offline in the field and
-                a dead tap is worse than plain text you can type out later. */}
-            {a.url ? (
-              <Text style={[type.valueSmall, { color: color.fgSubtle, marginTop: space.sm }]}>
-                {a.url}
-              </Text>
-            ) : null}
-
-            {!r.localised ? (
-              <Panel label="Not translated" tone="warn">
-                This app has no Hindi wording for this instruction, so the pod&apos;s English
-                is shown instead. Nothing has been left out — but ask someone to read it
-                with you rather than guessing at it.
-              </Panel>
-            ) : null}
-
-            {/* The pod and this app disagree about how well-sourced this
-                advice is. Not fatal, and the pod wins — but one of the two is
-                out of date and a silent disagreement is how a caution goes
-                missing. */}
-            {r.verificationMismatch ? (
-              <Panel label="Source marking disagrees" tone="warn">
-                The pod marked this advice differently from the registry this app ships
-                with. The pod&apos;s marking is the one shown above. Worth reporting — it
-                means one of the two is out of date.
-              </Panel>
-            ) : null}
-
-            <ChipRow>
-              <Chip
-                label="CONFIDENCE"
-                value={String(a.confidence)}
-                tone={CONFIDENCE_TONE[a.confidence] ?? 'neutral'}
-              />
-              <Chip
-                value={a.advisory_only ? 'ADVISORY ONLY' : 'UNLABELLED'}
-                tone={a.advisory_only ? 'good' : 'bad'}
-              />
-              {/* Provenance of the words themselves. The pod has no generative
-                  layer, so anything not stamped "template" did not come from it. */}
-              <Chip
-                label="WORDING"
-                value={a.generated_by === 'template' ? 'FIXED TEMPLATE' : String(a.generated_by)}
-                tone={a.generated_by === 'template' ? 'neutral' : 'warn'}
-              />
-            </ChipRow>
-          </View>
-        );
-      })}
-
-      {/* One standing note at the foot, in addition to the per-action chip.
-          Nothing in this system operates a pump, a valve or a sprayer. */}
-      <Panel label="Advisory only" tone="neutral">
-        This system recommends; it does not act. It is not connected to any pump, valve
-        or sprayer, and nothing above happens on its own.
-      </Panel>
+      <Text style={[type.small, { color: color.fgSubtle, marginTop: space.md }]}>
+        {language === 'hi'
+          ? 'यह प्रणाली केवल सलाह देती है। यह किसी पंप, वाल्व या स्प्रेयर को नहीं चलाती।'
+          : 'AEGIS only advises. It does not run any pump, valve or sprayer.'}
+      </Text>
     </Card>
   );
 }
+
+function ActionRow({
+  action: a,
+  language,
+  first,
+}: {
+  action: Advisory['actions'][number];
+  language: Language;
+  first: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const r = renderAction(a, language);
+  const v = presentVerification(a.verification_status, language);
+  const hi = language === 'hi';
+
+  return (
+    <View style={{ marginTop: first ? 0 : space.md }}>
+      {!first ? <Divider /> : null}
+      <View style={s.actionHead}>
+        <View style={s.rank}>
+          <Text style={[type.chipLabel, { color: color.primaryForeground }]}>{a.rank}</Text>
+        </View>
+        <Text style={[type.body, { color: color.foreground, flex: 1, lineHeight: 21 }]}>
+          {r.action}
+        </Text>
+      </View>
+
+      {/* Mandatory, structural, and above the reasoning rather than below it —
+          a caution a reader reaches after the dose is a caution they read after
+          deciding. */}
+      {v.mandatory ? (
+        <Panel label={hi ? 'पहले यह पढ़ें' : 'Read this first'} tone={v.tone as Tone}>
+          {v.note}
+        </Panel>
+      ) : null}
+
+      <View style={[s.chipLine, { marginTop: space.sm }]}>
+        <StatusChip label={v.badge} tone={v.tone as Tone} />
+        <StatusChip
+          label={a.advisory_only ? (hi ? 'केवल सलाह' : 'ADVISORY ONLY') : 'UNLABELLED'}
+          tone={a.advisory_only ? 'good' : 'bad'}
+        />
+        <StatusChip
+          label={
+            hi
+              ? `भरोसा ${CONFIDENCE_HI[a.confidence] ?? String(a.confidence)}`
+              : `CONFIDENCE ${String(a.confidence).toUpperCase()}`
+          }
+          tone={CONFIDENCE_TONE[a.confidence] ?? 'neutral'}
+        />
+        {/* Provenance of the words themselves. The pod has no generative layer,
+            so anything not stamped "template" did not come from it — only that
+            case is worth a chip. */}
+        {a.generated_by !== 'template' ? (
+          <StatusChip label={`WORDING ${String(a.generated_by).toUpperCase()}`} tone="warn" />
+        ) : null}
+      </View>
+
+      {!r.localised ? (
+        <Panel label="Not translated" tone="warn">
+          This app has no Hindi wording for this instruction, so the pod&apos;s English is
+          shown instead. Ask someone to read it with you rather than guessing at it.
+        </Panel>
+      ) : null}
+
+      {/* The pod and this app disagree about how well-sourced this advice is.
+          Not fatal, and the pod wins — but a silent disagreement is how a
+          caution goes missing. */}
+      {r.verificationMismatch ? (
+        <Panel label="Source marking disagrees" tone="warn">
+          The pod marked this advice differently from the registry this app ships with. The
+          pod&apos;s marking is the one shown. Worth reporting.
+        </Panel>
+      ) : null}
+
+      <Pressable
+        onPress={() => setOpen((o) => !o)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        style={{ marginTop: space.sm, alignSelf: 'flex-start', paddingVertical: 4 }}
+      >
+        <Text style={[type.label, { color: color.primary }]}>
+          {open ? (hi ? 'कारण छिपाएँ −' : 'Hide why −') : hi ? 'क्यों? +' : 'Why? +'}
+        </Text>
+      </Pressable>
+
+      {open ? (
+        <View>
+          {r.rationale ? (
+            <Text style={[type.small, { color: color.mutedForeground, marginTop: space.xs }]}>
+              {r.rationale}
+            </Text>
+          ) : null}
+          {!v.mandatory ? (
+            <Text style={[type.small, { color: color.fgSubtle, marginTop: space.sm }]}>
+              {v.note}
+            </Text>
+          ) : null}
+          {/* Plain text rather than a link: this phone is offline in the field
+              and a dead tap is worse than text you can type out later. */}
+          {a.url ? (
+            <Text style={[type.valueSmall, { color: color.fgSubtle, marginTop: space.sm }]}>
+              {a.url}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * The offline language switch for the template actions.
+ *
+ * This is the whole point of the pod shipping `template_id` and `params` rather
+ * than only a rendered sentence: the Hindi comes out of a table compiled into
+ * the app, with no model and no network. It sits in the action card's header
+ * because it changes that card and nothing else.
+ */
+export function LanguageToggle({
+  value,
+  onChange,
+}: {
+  value: Language;
+  onChange: (l: Language) => void;
+}) {
+  const options: { code: Language; label: string }[] = [
+    { code: 'en', label: 'EN' },
+    { code: 'hi', label: 'हिंदी' },
+  ];
+  return (
+    <View style={s.toggle}>
+      {options.map((o) => {
+        const active = o.code === value;
+        return (
+          <Pressable
+            key={o.code}
+            onPress={() => onChange(o.code)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={o.code === 'en' ? 'English' : 'Hindi'}
+            style={[s.toggleItem, active && { backgroundColor: color.primary }]}
+          >
+            <Text
+              style={[
+                type.chipValue,
+                { color: active ? color.primaryForeground : color.mutedForeground, fontSize: 12 },
+              ]}
+            >
+              {o.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 
 // ---- Scan -----------------------------------------------------------------
 
 /** What the walk itself consisted of. Never labelled a flight. */
 export function ScanCard({ advisory }: { advisory: Advisory }) {
   const scan = advisory.scan;
+  const health = advisory.crop_health;
+  const seconds =
+    scan.ended_utc && !Number.isNaN(Date.parse(scan.ended_utc))
+      ? Math.round((Date.parse(scan.ended_utc) - Date.parse(scan.started_utc)) / 1000)
+      : null;
+  const mostDiscarded =
+    scan.frames_captured > 0 && scan.frames_evaluated / scan.frames_captured < 0.6;
+  const rejectedNotCrop = health?.frames_rejected_not_crop ?? 0;
+  const rejectedOod = health?.frames_rejected_ood ?? 0;
+
   return (
-    <Card eyebrow="Scan" title="How this was collected">
+    <Card
+      eyebrow="Scan"
+      title="Scan details"
+      summary={[
+        `${scan.frames_evaluated} of ${scan.frames_captured} frames used`,
+        seconds !== null ? formatDuration(seconds) : null,
+        advisory.replay ? 'replayed video' : String(scan.mode).replace(/_/g, ' '),
+      ]
+        .filter(Boolean)
+        .join(' · ')}
+      summaryTone={mostDiscarded ? 'warn' : 'neutral'}
+    >
       <Row>
         <Muted>Started</Muted>
         <Text style={[type.valueSmall, { color: color.foreground }]}>
@@ -680,10 +859,19 @@ export function ScanCard({ advisory }: { advisory: Advisory }) {
         <Stat value={String(scan.tiles_classified)} caption="Patches examined" />
       </View>
 
+      {/* Moved here from the verdict card. Thrown-away frames never entered
+          the vote, so they belong with how the scan was collected rather than
+          beside the verdict they had no part in. */}
+      {rejectedNotCrop + rejectedOod > 0 ? (
+        <Text style={[type.small, { color: color.mutedForeground, marginTop: space.sm }]}>
+          {`${rejectedNotCrop} frame${rejectedNotCrop === 1 ? ' was' : 's were'} not crop and ${rejectedOod} did not look like anything the model was trained on. Both were set aside before the vote rather than forced into a class.`}
+        </Text>
+      ) : null}
+
       {/* Frames are thrown away by quality gates before anything is classified.
           A scan that kept a third of its frames is a scan worth repeating, and
           nothing else on the screen says so. */}
-      {scan.frames_captured > 0 && scan.frames_evaluated / scan.frames_captured < 0.6 ? (
+      {mostDiscarded ? (
         <Panel label="Most frames were discarded" tone="warn">
           {`Only ${scan.frames_evaluated} of ${scan.frames_captured} frames were sharp and well-lit enough to use. Walking more slowly, holding the pod steadier, or scanning out of hard direct sun will keep more of them.`}
         </Panel>
@@ -694,14 +882,11 @@ export function ScanCard({ advisory }: { advisory: Advisory }) {
       <Row>
         <Muted>Distance walked</Muted>
         <Text style={[type.valueSmall, { color: color.foreground }]}>
-          {scan.distance_walked_m === null ? 'not recorded' : `${scan.distance_walked_m} m`}
+          {scan.distance_walked_m === null
+            ? `not recorded${scan.distance_reason ? ` · ${shortStatus(scan.distance_reason).toLowerCase()}` : ''}`
+            : `${scan.distance_walked_m} m`}
         </Text>
       </Row>
-      {scan.distance_walked_m === null && scan.distance_reason ? (
-        <Panel label="Distance walked" tone="unknown">
-          {humaniseStatus(scan.distance_reason)}
-        </Panel>
-      ) : null}
 
       <ChipRow>
         <Chip label="MODE" value={String(scan.mode).replace(/_/g, ' ')} />
@@ -722,6 +907,23 @@ export function formatStamp(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 }
 
+/** "25 Sep, 3:15 pm" — the form a person says out loud. */
+export function formatWhen(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function formatDuration(seconds: number): string {
+  if (seconds < 90) return `${seconds} s walk`;
+  return `${Math.round(seconds / 60)} min walk`;
+}
+
 const s = StyleSheet.create({
   banner: {
     borderWidth: 1,
@@ -730,6 +932,7 @@ const s = StyleSheet.create({
     paddingVertical: 10,
     marginBottom: space.md,
   },
+  bannerRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: 8 },
   violations: {
     borderRadius: radius.xl,
     borderWidth: 1,
@@ -739,6 +942,16 @@ const s = StyleSheet.create({
     marginBottom: space.md,
   },
   head: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  actionHead: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },
+  chipLine: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  toggle: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: color.border,
+    borderRadius: radius.pill,
+    padding: 2,
+  },
+  toggleItem: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: radius.pill },
 
   verdictCard: {
     backgroundColor: color.card,

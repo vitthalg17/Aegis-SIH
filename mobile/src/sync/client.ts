@@ -211,7 +211,7 @@ export class HttpError extends Error {
           ? 'The pod refused that advisory because it was produced by the simulated model backend, not by the real one. A production pod never serves those. Nothing is wrong with your phone.'
           : 'The pod refused that request.';
       case 404:
-        return 'The pod does not have that advisory. It never did — nothing was deleted.';
+        return 'The pod does not have that advisory. It never did, and nothing was deleted.';
       case 409:
         return 'The pod is already syncing with the ground mast. Wait for that to finish and try again.';
       case 410:

@@ -73,7 +73,7 @@ export const TIERS: Record<string, TierInfo> = {
     tier: 'TESTED_FAILED',
     label: 'FAILED ON NEW CAMERAS',
     body:
-      'On photographs from equipment the model never learned from, it almost never recognised this condition correctly. A high confidence figure here does not mean the finding is right — the two were measured to be unrelated for this class. Treat it as a prompt to look, not as a diagnosis.',
+      'On photographs from equipment the model never learned from, it almost never recognised this condition correctly. A high confidence figure here does not mean the finding is right: the two were measured to be unrelated for this class. Treat it as a prompt to look, not as a diagnosis.',
     severity: 4,
   },
   UNTESTED: {
@@ -114,7 +114,7 @@ export const MACRO_F1 = { heldOut: 0.374, inDistribution: 0.9485 } as const;
  */
 export const CONFIDENCE_CAVEAT =
   'Confidence is how sure the model is of its own answer. It is not the chance ' +
-  'that the answer is correct — on photographs from cameras this model never ' +
+  'that the answer is correct. On photographs from cameras this model never ' +
   'trained on, it recovered about a third of cases overall.';
 
 /**
