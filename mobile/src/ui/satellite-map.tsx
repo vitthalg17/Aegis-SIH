@@ -26,11 +26,18 @@
  * so the map works in Expo Go and in a dev build alike. Leaflet itself comes
  * from the CDN: when there is internet for the tiles there is internet for the
  * script, and when there is not, the fallback takes over either way.
+ *
+ * ── Panning ─────────────────────────────────────────────────────────────────
+ * Inside a scrolling page a one-finger drag cannot both scroll the page and
+ * pan the map, so the inline map keeps the page scroll and offers pinch and
+ * +/- to zoom. Zoomed in, the farmer taps "Full screen": there is no page
+ * around the map there, so one finger pans it.
  */
 
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import type { WebViewMessageEvent } from 'react-native-webview';
 
@@ -80,22 +87,39 @@ export function SatelliteMap({
   onOpen?: (id: string) => void;
 }) {
   const [phase, setPhase] = useState<Phase>('loading');
+  const [expanded, setExpanded] = useState(false);
+  const insets = useSafeAreaInsets();
   const openLabel = tr('Open scan');
   const html = useMemo(
-    () => buildHtml(points, radiusM, !!onOpen, openLabel),
+    () => buildHtml(points, radiusM, !!onOpen, openLabel, false),
+    [points, radiusM, onOpen, openLabel],
+  );
+  const fullHtml = useMemo(
+    () => buildHtml(points, radiusM, !!onOpen, openLabel, true),
     [points, radiusM, onOpen, openLabel],
   );
 
-  const onMessage = (e: WebViewMessageEvent) => {
-    let msg: { type?: string; id?: string } = {};
+  const parse = (e: WebViewMessageEvent): { type?: string; id?: string } => {
     try {
-      msg = JSON.parse(e.nativeEvent.data);
+      return JSON.parse(e.nativeEvent.data);
     } catch {
-      return;
+      return {};
     }
+  };
+
+  const onMessage = (e: WebViewMessageEvent) => {
+    const msg = parse(e);
     if (msg.type === 'tiles-ok') setPhase('ok');
     if (msg.type === 'offline') setPhase((p) => (p === 'ok' ? p : 'offline'));
     if (msg.type === 'open' && msg.id && onOpen) onOpen(msg.id);
+  };
+
+  const onFullMessage = (e: WebViewMessageEvent) => {
+    const msg = parse(e);
+    if (msg.type === 'open' && msg.id && onOpen) {
+      setExpanded(false);
+      onOpen(msg.id);
+    }
   };
 
   if (phase === 'offline') {
@@ -119,7 +143,8 @@ export function SatelliteMap({
         onHttpError={() => setPhase('offline')}
         // The page scrolls; the map must not steal that. No nestedScrollEnabled:
         // on Android it stops the page taking any gesture that starts on the map,
-        // which trapped the thumb there. Pinch and the +/- buttons still zoom.
+        // which trapped the thumb there. Pinch and the +/- buttons still zoom;
+        // panning is in the full screen view.
         scrollEnabled={false}
         style={{ backgroundColor: chart.grid }}
         javaScriptEnabled
@@ -137,11 +162,54 @@ export function SatelliteMap({
           </Text>
         </View>
       ) : null}
+      {phase === 'ok' ? (
+        <Pressable
+          onPress={() => setExpanded(true)}
+          accessibilityRole="button"
+          accessibilityLabel={tr('Full screen map')}
+          hitSlop={8}
+          style={s.expand}
+        >
+          <Text style={[type.label, { color: color.primaryForeground }]}>{tr('Full screen')}</Text>
+        </Pressable>
+      ) : null}
+      <Modal visible={expanded} animationType="slide" onRequestClose={() => setExpanded(false)}>
+        <View style={s.full}>
+          {expanded ? (
+            <WebView
+              source={{ html: fullHtml, baseUrl: 'https://aegis.local/' }}
+              originWhitelist={['*']}
+              onMessage={onFullMessage}
+              scrollEnabled={false}
+              style={{ backgroundColor: chart.grid }}
+              javaScriptEnabled
+              domStorageEnabled
+              cacheEnabled
+              cacheMode="LOAD_CACHE_ELSE_NETWORK"
+            />
+          ) : null}
+          <Pressable
+            onPress={() => setExpanded(false)}
+            accessibilityRole="button"
+            accessibilityLabel={tr('Close map')}
+            hitSlop={8}
+            style={[s.close, { top: insets.top + space.sm }]}
+          >
+            <Text style={[type.label, { color: color.primaryForeground }]}>{tr('Close')}</Text>
+          </Pressable>
+        </View>
+      </Modal>
     </View>
   );
 }
 
-function buildHtml(points: GeoPoint[], radiusM: number, linkable: boolean, openLabel: string): string {
+function buildHtml(
+  points: GeoPoint[],
+  radiusM: number,
+  linkable: boolean,
+  openLabel: string,
+  interactive: boolean,
+): string {
   const data = points.map((p) => ({
     lat: p.lat,
     lon: p.lon,
@@ -161,8 +229,8 @@ function buildHtml(points: GeoPoint[], radiusM: number, linkable: boolean, openL
   .leaflet-popup-content b { font-size: 14px; }
   .leaflet-popup-content a { color: #2E7D32; font-weight: 600; text-decoration: none; }
   .leaflet-control-attribution { font-size: 9px; }
-  /* Let a vertical swipe on the map scroll the page. */
-  .leaflet-container { touch-action: pan-y pinch-zoom !important; }
+  /* Inline: a vertical swipe on the map scrolls the page. Full screen: the map takes every gesture. */
+  .leaflet-container { touch-action: ${interactive ? 'none' : 'pan-y pinch-zoom'} !important; }
 </style>
 </head><body>
 <div id="map"></div>
@@ -181,8 +249,9 @@ function buildHtml(points: GeoPoint[], radiusM: number, linkable: boolean, openL
   var map = L.map('map', {
     zoomControl: true,
     attributionControl: true,
-    // Dragging would fight the page scroll; pinch and the +/- buttons zoom.
-    dragging: false,
+    // Inline, dragging would fight the page scroll; pinch and the +/- buttons
+    // zoom. The full screen view has no page to scroll, so it pans.
+    dragging: ${interactive},
     scrollWheelZoom: false,
     doubleClickZoom: true,
     touchZoom: true,
@@ -194,6 +263,10 @@ function buildHtml(points: GeoPoint[], radiusM: number, linkable: boolean, openL
   ).addTo(map);
   tiles.on('tileload', function () { if (!gotTile) { gotTile = true; post({ type: 'tiles-ok' }); } });
   L.control.scale({ metric: true, imperial: false, position: 'bottomleft' }).addTo(map);
+  // The full screen view is laid out after the page loads, so Leaflet can
+  // measure a smaller box than it ends up in and leave the rest untiled.
+  if (window.ResizeObserver) new ResizeObserver(function () { map.invalidateSize(); }).observe(document.getElementById('map'));
+  setTimeout(function () { map.invalidateSize(); }, 400);
 
   var group = [];
   points.forEach(function (p) {
@@ -227,6 +300,24 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: color.border,
     backgroundColor: chart.grid,
+  },
+  expand: {
+    position: 'absolute',
+    top: space.sm,
+    right: space.sm,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+    borderRadius: radius.lg,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+  },
+  full: { flex: 1, backgroundColor: chart.grid },
+  close: {
+    position: 'absolute',
+    right: space.md,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+    borderRadius: radius.lg,
+    backgroundColor: 'rgba(0,0,0,0.65)',
   },
   loading: {
     position: 'absolute',

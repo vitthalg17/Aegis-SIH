@@ -117,6 +117,10 @@ export const SCREENS: Record<string, string> = {
   'No internet, so no satellite image. The positions are the same; only the picture underneath is missing.':
     'इंटरनेट नहीं है, इसलिए सैटेलाइट की तस्वीर नहीं है। जगहें वही हैं; बस नीचे की तस्वीर नहीं है।',
   'Loading satellite image': 'सैटेलाइट की तस्वीर आ रही है',
+  'Full screen': 'पूरी स्क्रीन',
+  'Full screen map': 'पूरी स्क्रीन पर नक्शा',
+  Close: 'बंद करें',
+  'Close map': 'नक्शा बंद करें',
 
   // AI explanation
   'Generated · not a measurement': 'AI से लिखा · यह माप नहीं है',

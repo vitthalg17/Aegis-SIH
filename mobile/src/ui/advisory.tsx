@@ -647,14 +647,14 @@ export function ActionsCard({
 
   if (!actions || actions.length === 0) {
     return (
-      <Card title={language === 'hi' ? 'क्या करें' : 'What to do'} right={toggle}>
+      <Card title={language === 'hi' ? 'किसान सलाह' : 'Farmer Advisory'} right={toggle}>
         <Muted>{language === 'hi' ? 'इस सलाह में कोई कार्य नहीं है।' : 'No actions in this advisory.'}</Muted>
       </Card>
     );
   }
 
   return (
-    <Card title={language === 'hi' ? 'क्या करें' : 'What to do'} right={toggle}>
+    <Card title={language === 'hi' ? 'किसान सलाह' : 'Farmer Advisory'} right={toggle}>
       {actions.map((a, i) => (
         <ActionRow
           key={`${a.rank}-${a.template_id}`}
