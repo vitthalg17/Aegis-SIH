@@ -1,10 +1,10 @@
 /**
- * Profile: for now, the language the whole app speaks.
+ * Profile: the language the whole app speaks, and the AI provider and key.
  *
- * The choice is saved on the phone and applies to every screen at once:
+ * The language is saved on the phone and applies to every screen at once:
  * labels, verdicts, advice, reading tiles and dates. The heading is always
  * written in both languages, so someone who cannot read the current one can
- * still find the way back.
+ * still find the way back. The AI card is ai-settings.tsx.
  */
 
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -12,6 +12,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLanguage } from '../src/i18n/language.tsx';
 import type { AppLanguage } from '../src/i18n/tr.ts';
 import { tr } from '../src/i18n/tr.ts';
+import { AiSettingsCard } from '../src/ui/ai-settings.tsx';
 import { useStatusBarStyle } from '../src/ui/status-bar.ts';
 import { ProfileIcon } from '../src/ui/tab-icons.tsx';
 import { color, radius, shadow, space, type } from '../src/ui/theme.ts';
@@ -28,7 +29,11 @@ export default function ProfileScreen() {
   return (
     <ScrollView
       style={{ backgroundColor: color.background }}
-      contentContainerStyle={{ padding: space.lg, paddingBottom: space.xl }}
+      contentContainerStyle={{ padding: space.lg, paddingBottom: space.xxl * 3 }}
+      // The key field sits low on the screen; the keyboard must not cover it.
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      automaticallyAdjustKeyboardInsets
     >
       <View style={s.identity}>
         <View style={s.avatar}>
@@ -79,6 +84,8 @@ export default function ProfileScreen() {
           {tr('Technical messages from the pod, and the scan code on each scan, stay in English.')}
         </Text>
       </View>
+
+      <AiSettingsCard />
     </ScrollView>
   );
 }

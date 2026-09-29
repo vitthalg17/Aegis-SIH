@@ -16,6 +16,7 @@ import {
 import { revalidateAll } from '../src/db/advisories.ts';
 import { getDb } from '../src/db/client.ts';
 import { seedFixturesIfEmpty } from '../src/db/seed.ts';
+import { loadLlmSettings } from '../src/llm/settings.ts';
 import { FieldsIcon, HomeIcon, PodIcon, ProfileIcon } from '../src/ui/tab-icons.tsx';
 import { color, font, type } from '../src/ui/theme.ts';
 import { LanguageProvider, loadSavedLanguage, useLanguage } from '../src/i18n/language.tsx';
@@ -49,6 +50,9 @@ export default function RootLayout() {
         // The farmer's language, before the first screen draws, so a Hindi
         // reader never sees the app flash up in English.
         setLanguage(await loadSavedLanguage());
+        // The AI provider and key, so the advisory screen knows on its first
+        // render whether it can offer an explanation.
+        await loadLlmSettings();
         setDbReady(true);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));

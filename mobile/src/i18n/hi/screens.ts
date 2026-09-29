@@ -92,6 +92,35 @@ export const SCREENS: Record<string, string> = {
   'Technical messages from the pod, and the scan code on each scan, stay in English.':
     'पॉड के तकनीकी संदेश और हर स्कैन का कोड अंग्रेज़ी में ही रहेंगे।',
 
+  // Profile: AI explanations
+  'AI explanations': 'AI से समझाना',
+  'IN USE': 'चालू है',
+  'Optional. Add your own API key to get a plain-language explanation on each scan. The scan and its advice work fully without it.':
+    'ज़रूरी नहीं। हर स्कैन पर आसान भाषा में समझाने के लिए अपनी API कुंजी डालें। स्कैन और उसकी सलाह इसके बिना भी पूरी चलती है।',
+  Provider: 'सेवा',
+  'API key': 'API कुंजी',
+  Model: 'मॉडल',
+  'Server address': 'सर्वर का पता',
+  Show: 'दिखाएँ',
+  Hide: 'छिपाएँ',
+  Other: 'अन्य',
+  'Get a key at {site}': 'कुंजी यहाँ से लें: {site}',
+  'Any service that speaks the OpenAI format, including one running on your own computer.':
+    'OpenAI प्रारूप वाली कोई भी सेवा, अपने कंप्यूटर पर चल रही सेवा भी।',
+  'Leave empty to use the one shown. Type a model name to use a different one.':
+    'दिखाया गया मॉडल लेने के लिए खाली छोड़ें। दूसरा मॉडल लेने के लिए उसका नाम लिखें।',
+  Save: 'सहेजें',
+  'Test key': 'कुंजी जाँचें',
+  'Testing…': 'जाँच हो रही है…',
+  Remove: 'हटाएँ',
+  'Key works': 'कुंजी चल रही है',
+  'Could not connect': 'जुड़ नहीं सका',
+  Saved: 'सहेज लिया',
+  '{name} answered using {model}.': '{name} ने {model} से जवाब दिया।',
+  'Explanations will now use {name}.': 'अब समझाने के लिए {name} इस्तेमाल होगा।',
+  'The key stays on this phone. When you ask for an explanation, that scan is sent to the provider you chose, and nothing else is.':
+    'कुंजी इसी फ़ोन में रहती है। जब आप समझाने को कहते हैं, तब वही स्कैन आपकी चुनी हुई सेवा को भेजा जाता है, और कुछ नहीं।',
+
   // Ages
   'just now': 'अभी',
   '{n} min ago': '{n} मिनट पहले',
@@ -132,8 +161,8 @@ export const SCREENS: Record<string, string> = {
     'अभी नहीं लिखा गया। इस काम के लिए इंटरनेट चाहिए। ऊपर की सलाह के लिए नहीं।',
   'Explain this advisory': 'यह सलाह समझाएँ',
   'Not configured': 'सेट नहीं है',
-  'No LLM endpoint is set, so explanations cannot be generated on this build. Everything else on this screen works without one.':
-    'इस ऐप में AI सेवा सेट नहीं है, इसलिए समझाने वाला हिस्सा नहीं बन सकता। इस स्क्रीन पर बाकी सब इसके बिना चलता है।',
+  'No AI provider is set, so explanations cannot be generated. Add an API key on the Profile tab. Everything else on this screen works without one.':
+    'कोई AI सेवा चुनी नहीं गई है, इसलिए समझाने वाला हिस्सा नहीं बन सकता। प्रोफ़ाइल टैब पर API कुंजी डालें। इस स्क्रीन पर बाकी सब इसके बिना चलता है।',
   'Writing the explanation…': 'समझाने वाला हिस्सा लिखा जा रहा है…',
   GENERATED: 'लिखा गया',
   'Write it again': 'फिर से लिखें',

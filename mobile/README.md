@@ -22,7 +22,7 @@ Everything below works today.
 cd mobile
 npm install
 npm start          # Expo dev server
-npm test           # schema, templates, cursor, LLM guard, geometry — 106 tests
+npm test           # schema, templates, cursor, LLM guard, geometry — 127 tests
 npm run typecheck
 npm run station    # fake pod gateway, serving the v1.0 API from the fixtures
 ```
@@ -253,21 +253,33 @@ a guard never seen to reject anything is not a guard.
 
 ### Configuring it
 
-Nothing is configured by default and the app says so rather than failing oddly.
-Pick one:
+Nothing is configured by default, and until it is the explanation card stays
+hidden rather than failing oddly.
+
+**On the phone (recommended).** Open the Profile tab, find **AI explanations**,
+pick a provider, paste a key, tap **Test key**, then **Save**. Supported: Claude,
+ChatGPT, Gemini, Groq, Grok, Mistral, DeepSeek, OpenRouter, and **Other** for any
+service that speaks the OpenAI chat-completions format (including Ollama on your
+own machine). Each provider keeps its own key, and the model name is editable
+because model names go stale faster than the app does. The key is stored in the
+app's private storage on the phone, so unlike a build-time key it is not inside
+the APK. The catalog is `src/llm/providers.ts`; adding a provider is one entry.
+
+**At build time (fallback, used only when nothing is saved on the phone).**
 
 ```bash
-# Preferred — the key stays on a server you control.
+# Preferred of the two: the key stays on a server you control.
 EXPO_PUBLIC_AEGIS_LLM_PROXY=https://your-proxy.example/v1
 
-# Demo-week alternative — the key is compiled into the bundle and is
+# Demo-week alternative: the key is compiled into the bundle and is
 # extractable from the APK by anyone who downloads it. EXPO_PUBLIC_ is Expo's
 # marker for "inlined into the bundle", which is a usefully blunt name for it.
 EXPO_PUBLIC_ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-Model is `claude-opus-5` at medium effort. One call per advisory per language,
-not per screen.
+Claude defaults to `claude-opus-5` at medium effort. One call per advisory per
+language, not per screen. Whichever provider writes the text, the guard above
+checks it the same way.
 
 ## Two platform gotchas
 

@@ -154,7 +154,13 @@ export type SyncKey =
   /** Which schema generation the stored records were last validated against. */
   | 'validated_against'
   /** The language the farmer picked on the Profile screen: 'en' or 'hi'. */
-  | 'app_language';
+  | 'app_language'
+  /**
+   * Which LLM provider the Profile screen is set to, and each provider's key,
+   * model and address, as JSON. Stays in the app's private storage on this
+   * phone and is never synced anywhere.
+   */
+  | 'llm_settings';
 
 export async function getState(key: SyncKey): Promise<string | null> {
   const db = await getDb();

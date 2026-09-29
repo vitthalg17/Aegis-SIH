@@ -24,6 +24,7 @@ import { explainAdvisory, isConfigured } from '../llm/client.ts';
 import type { Figure } from '../llm/guard.ts';
 import { LANGUAGES } from '../llm/prompt.ts';
 import type { Language } from '../llm/prompt.ts';
+import { useLlmSettings } from '../llm/settings.ts';
 import { currentLanguage, dateLocale, tr } from '../i18n/tr.ts';
 import type { Advisory } from '../schema/advisory.ts';
 import { Card, Panel, StatusChip } from './components.tsx';
@@ -41,6 +42,9 @@ export function ExplanationCard({ advisory }: { advisory: Advisory }) {
   // Starts on the app's language; the picker below can still switch it.
   const [language, setLanguage] = useState<Language>(currentLanguage());
   const [state, setState] = useState<State>({ phase: 'loading' });
+  // Subscribes to the Profile screen's AI settings, so saving a key there makes
+  // this card appear without leaving the advisory. `isConfigured()` reads them.
+  useLlmSettings();
 
   // Reload from the cache whenever the language changes — each language is its
   // own cached row, so switching is free once both have been generated.
@@ -178,7 +182,7 @@ function Body({ state, onGenerate }: { state: State; onGenerate: () => void }) {
         </>
       ) : (
         <Panel label={tr('Not configured')} tone="unknown">
-          {tr('No LLM endpoint is set, so explanations cannot be generated on this build. Everything else on this screen works without one.')}
+          {tr('No AI provider is set, so explanations cannot be generated. Add an API key on the Profile tab. Everything else on this screen works without one.')}
         </Panel>
       );
 
