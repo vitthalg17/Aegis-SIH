@@ -43,6 +43,7 @@ import type {
 } from '../schema/advisory.ts';
 import { DRIED_LEAF_CAVEAT, DRIED_LEAF_CLASS, describeClass } from '../schema/classes.ts';
 import { presentVerification, renderAction } from '../schema/templates.ts';
+import { sourceLine } from '../scan/report.ts';
 import type { Language } from '../schema/templates.ts';
 import type { AdvisoryOrigin } from '../db/advisories.ts';
 import type { Violation } from '../schema/validate.ts';
@@ -838,9 +839,12 @@ export function ScanCard({ advisory }: { advisory: Advisory }) {
   const scan = advisory.scan;
   const health = advisory.crop_health;
   const seconds =
-    scan.ended_utc && !Number.isNaN(Date.parse(scan.ended_utc))
-      ? Math.round((Date.parse(scan.ended_utc) - Date.parse(scan.started_utc)) / 1000)
-      : null;
+    typeof scan.duration_s === 'number'
+      ? scan.duration_s
+      : scan.ended_utc && !Number.isNaN(Date.parse(scan.ended_utc))
+        ? Math.round((Date.parse(scan.ended_utc) - Date.parse(scan.started_utc)) / 1000)
+        : null;
+  const where = sourceLine(advisory);
   const mostDiscarded =
     scan.frames_captured > 0 && scan.frames_evaluated / scan.frames_captured < 0.6;
   const rejectedNotCrop = health?.frames_rejected_not_crop ?? 0;
@@ -909,6 +913,12 @@ export function ScanCard({ advisory }: { advisory: Advisory }) {
         </Text>
       </Row>
 
+      {/* Where the clock and the positions came from. One neutral line: the
+          phone supplying either is an ordinary thing, not a fault. */}
+      {where ? (
+        <Text style={[type.small, { color: color.mutedForeground, marginTop: space.sm }]}>{where}</Text>
+      ) : null}
+
       <ChipRow>
         <Chip label={tr('MODE')} value={modeLabel(scan.mode)} />
         <Chip label={tr('ENGINE')} value={String(advisory.inference_backend).toUpperCase()} />
@@ -929,6 +939,7 @@ export function formatStamp(iso: string): string {
 }
 
 function modeLabel(mode: unknown): string {
+  if (mode === 'walk') return tr('walk');
   return mode === 'handheld_pod' ? tr('handheld pod') : String(mode).replace(/_/g, ' ');
 }
 

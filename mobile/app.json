@@ -25,11 +25,18 @@
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.ACCESS_WIFI_STATE",
-        "android.permission.CHANGE_NETWORK_STATE"
+        "android.permission.CHANGE_NETWORK_STATE",
+        "android.permission.VIBRATE"
       ]
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "AEGIS uses this phone's location while you walk a field, so it can mark on the map where problems are. It is only read while a scan is running."
+        }
+      ],
       [
         "expo-build-properties",
         {

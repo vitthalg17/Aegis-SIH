@@ -627,6 +627,10 @@ export function humaniseStatus(status?: string): string {
     case 'GPS_TRACK_NOT_RECORDED':
       return tr('No satellite track was recorded during the walk, so the distance covered is not known.');
 
+    // -- Field station, on a walk ----------------------------------------------
+    case 'NO_VALID_MAST_READING':
+      return tr('The field station gave no valid reading for this walk, so there are no weather or soil figures. Nothing is estimated in their place.');
+
     default:
       return status ?? tr('Not available.');
   }

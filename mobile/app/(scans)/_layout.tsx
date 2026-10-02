@@ -1,5 +1,6 @@
 /**
- * The Home tab: the dashboard, the full scan list, and a scan pushed on top.
+ * The Home tab: the dashboard, the full scan list, a scan pushed on top, and
+ * the live screen for a walk in progress.
  *
  * A stack inside the tab rather than beside it, so the bottom bar stays on
  * screen while a scan is open. One tap on Home always gets back to the
@@ -62,6 +63,11 @@ export default function ScansLayout() {
         options={{ title: tr('All scans'), headerLeft: () => <BackButton label={tr('Home')} /> }}
       />
       <Stack.Screen name="advisory/[id]" options={{ title: tr('Scan') }} />
+      {/* The walk in progress. Leaving it does not stop the walk. */}
+      <Stack.Screen
+        name="live"
+        options={{ title: tr('Scanning'), headerLeft: () => <BackButton label={tr('Home')} /> }}
+      />
     </Stack>
   );
 }

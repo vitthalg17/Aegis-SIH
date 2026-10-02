@@ -1,7 +1,8 @@
 /**
- * Home: what happened on the latest scan, where the problems are, and what
- * else is recent.
+ * Home: start a walk, what happened on the latest scan, where the problems are,
+ * and what else is recent.
  *
+ *   0. Scan a field  is the pod ready, and Start (or the walk already running)
  *   1. Latest scan   its verdict, how far to trust it, and the first thing to do
  *   2. Where to look  every flagged finding with a GPS fix, on one map
  *   3. Counts         need a look / healthy / unclear, each opening the list
@@ -35,6 +36,7 @@ import { CountTiles } from '../../src/ui/count-tiles.tsx';
 import { extentMetres, pickScaleMetres, toMetres, toUnitSquare } from '../../src/ui/field-geometry.ts';
 import { FIX_RADIUS_M, SatelliteMap } from '../../src/ui/satellite-map.tsx';
 import type { GeoPoint } from '../../src/ui/satellite-map.tsx';
+import { ScanPanel } from '../../src/ui/scan-panel.tsx';
 import { ScanRow, rowVerdict } from '../../src/ui/scan-row.tsx';
 import { useStatusBarStyle } from '../../src/ui/status-bar.ts';
 import { color, radius, shadow, space, type } from '../../src/ui/theme.ts';
@@ -112,6 +114,9 @@ export default function HomeScreen() {
       </View>
 
       <View style={{ padding: space.lg }}>
+        {/* Is the pod ready, and the button that starts a walk. */}
+        <ScanPanel />
+
         {rows.length === 0 ? (
           <View style={s.card}>
             <Text style={[type.cardTitle, { color: color.foreground }]}>{tr('No scans yet')}</Text>

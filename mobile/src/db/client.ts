@@ -15,7 +15,7 @@ import * as SQLite from 'expo-sqlite';
 
 const DB_NAME = 'aegis.db';
 
-let handle: SQLite.SQLiteDatabase | null = null;
+let handle: Promise<SQLite.SQLiteDatabase> | null = null;
 
 const MIGRATIONS: string[] = [
   // v1 — advisories and sync state.
@@ -160,7 +160,9 @@ export type SyncKey =
    * model and address, as JSON. Stays in the app's private storage on this
    * phone and is never synced anywhere.
    */
-  | 'llm_settings';
+  | 'llm_settings'
+  /** The field the last walk was started on, offered again in the Start sheet. */
+  | 'last_field_id';
 
 export async function getState(key: SyncKey): Promise<string | null> {
   const db = await getDb();

@@ -4,6 +4,7 @@
  * The ordering is deliberate and is the argument this screen makes:
  *
  *   1. what you cannot trust about this record   origin, backend, violations
+ *   1b. the walk report, for a walk from the app  summary, timeline, map, look-list
  *   2. the verdict, in one sentence              crop_health
  *   3. what to do                                actions, then the explanation
  *   4. the findings and how much they are worth  disease
@@ -46,6 +47,8 @@ import { VegetationCard } from '../../../src/ui/vegetation.tsx';
 import { IrrigationCard, NdviCard, ThermalCard } from '../../../src/ui/water.tsx';
 import { Card, Group, Muted, TileGrid } from '../../../src/ui/components.tsx';
 import { ExplanationCard } from '../../../src/ui/explanation.tsx';
+import { WalkReport } from '../../../src/ui/walk-report.tsx';
+import { isWalkReport } from '../../../src/scan/report.ts';
 import { missingBlocks } from '../../../src/schema/validate.ts';
 import type { Language } from '../../../src/schema/templates.ts';
 import { fieldIdFromAdvisoryId } from '../../../src/schema/advisory.ts';
@@ -154,6 +157,12 @@ export default function AdvisoryScreen() {
       <OriginBanner origin={stored.origin} />
       <BackendBanner advisory={a} />
       <ViolationsCard violations={stored.violations} />
+
+      {/* A walk the farmer ran from the app leads with its own report: the
+          numbers, the timeline, the map and the places to look. Everything an
+          older single scan shows is still below, unchanged, and a scan without
+          walk fields never reaches this. */}
+      {isWalkReport(a) ? <WalkReport advisory={a} /> : null}
 
       {/* The one sentence a farmer came for. */}
       <CropHealthCard health={a.crop_health} topClass={topFinding(a)} />

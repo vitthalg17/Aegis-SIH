@@ -17,9 +17,11 @@ import { POD } from './hi/pod.ts';
 import { READINGS } from './hi/readings.ts';
 import { SCAN } from './hi/scan.ts';
 import { SCREENS } from './hi/screens.ts';
+import { WALK } from './hi/walk.ts';
 
 export const HI: Record<string, string> = {
   ...SCREENS,
+  ...WALK,
   ...POD,
   ...SCAN,
   ...FINDINGS,

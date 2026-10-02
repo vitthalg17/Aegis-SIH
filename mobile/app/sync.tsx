@@ -14,7 +14,8 @@
  *
  * ── What has not been proven ────────────────────────────────────────────────
  * The hardware team named two endpoints as untested on the real Jetson —
- * `sync/trigger` and `trap/upload` — and the SIH-FIELD access point itself is
+ * `sync/trigger` (no longer called from here: the pod now collects from the
+ * station by itself at Start and Stop) and `trap/upload` — and the SIH-FIELD access point itself is
  * waiting on a replacement WiFi dongle, so nothing here has run over the radio
  * it will ship on. Both facts are on the screen rather than in a commit
  * message, because when one of them fails in front of a judge the useful thing
@@ -40,8 +41,8 @@ import {
   pullLatest,
   setAllowMock,
   setBaseUrl,
-  triggerMastSync,
 } from '../src/sync/client.ts';
+import { shutdownPod } from '../src/scan/api.ts';
 import type { Health, MastSyncStatus } from '../src/sync/client.ts';
 import { bindToLocalWifi } from '../src/sync/network.ts';
 import { describeAge, useSync } from '../src/sync/state.ts';
@@ -56,6 +57,8 @@ import {
   StatCard,
   StatusChip,
 } from '../src/ui/components.tsx';
+import { ConfirmDialog } from '../src/ui/confirm.tsx';
+import { StartScanSheet } from '../src/ui/start-scan-sheet.tsx';
 import { useStatusBarStyle } from '../src/ui/status-bar.ts';
 import { color, radius, space, type } from '../src/ui/theme.ts';
 import { useLanguage } from '../src/i18n/language.tsx';
@@ -78,7 +81,11 @@ export default function SyncScreen() {
   const [mast, setMast] = useState<MastSyncStatus | null>(null);
   /** True while `mast` is the remembered reading rather than a fresh one. */
   const [mastStale, setMastStale] = useState(false);
-  const [mastNote, setMastNote] = useState<{ text: string; bad: boolean } | null>(null);
+  const [mastError, setMastError] = useState<string | null>(null);
+  const [replaySheet, setReplaySheet] = useState(false);
+  const [confirmShutdown, setConfirmShutdown] = useState(false);
+  const [shuttingDown, setShuttingDown] = useState(false);
+  const [powerNote, setPowerNote] = useState<{ text: string; bad: boolean } | null>(null);
   const [allowMock, setAllowMockState] = useState(false);
   const [paste, setPaste] = useState('');
   const [importNote, setImportNote] = useState<{ text: string; bad: boolean } | null>(null);
@@ -112,7 +119,7 @@ export default function SyncScreen() {
   }, []);
 
   const checkMast = useCallback(async () => {
-    setMastNote(null);
+    setMastError(null);
     try {
       setMast(await getMastSyncStatus());
       setMastStale(false);
@@ -120,9 +127,27 @@ export default function SyncScreen() {
       // Keep whatever was on screen. Replacing a remembered reading with
       // nothing because the pod is out of range loses information for no gain.
       setMastStale(true);
-      setMastNote({ text: e instanceof Error ? e.message : String(e), bad: true });
+      setMastError(e instanceof Error ? e.message : String(e));
     }
   }, []);
+
+  const shutDown = async () => {
+    setShuttingDown(true);
+    try {
+      const r = await shutdownPod();
+      setPowerNote({
+        text:
+          r.afterSeconds === null
+            ? tr('The pod is shutting down. Wait for it to switch itself off before you unplug it.')
+            : tr('The pod will start shutting down in {s} seconds. Wait for it to switch itself off before you unplug it.', { s: r.afterSeconds }),
+        bad: false,
+      });
+    } catch (e) {
+      setPowerNote({ text: e instanceof Error ? e.message : String(e), bad: true });
+    }
+    setShuttingDown(false);
+    setConfirmShutdown(false);
+  };
 
   const busy = state === 'syncing';
   const skew = health ? clockSkewSeconds(health) : null;
@@ -351,6 +376,26 @@ export default function SyncScreen() {
         ) : null}
       </Card>
 
+      {/* Switching the pod off properly. A running scan is stopped and saved by
+          the pod first, so this is also the safe way to end a session. */}
+      <Card eyebrow={tr('Pod')} title={tr('Switch the pod off')}>
+        <Muted>
+          {tr('Shuts the pod down properly so nothing is lost. If a scan is running it is stopped and saved first. To use the pod again, switch it on by hand.')}
+        </Muted>
+        <Pressable
+          onPress={() => setConfirmShutdown(true)}
+          accessibilityRole="button"
+          style={({ pressed }) => [s.button, s.buttonDanger, pressed && { opacity: 0.6 }]}
+        >
+          <Text style={[type.label, { color: color.destructive }]}>{tr('Shut down pod')}</Text>
+        </Pressable>
+        {powerNote ? (
+          <Panel label={powerNote.bad ? tr('Could not do that') : tr('Shutting down')} tone={powerNote.bad ? 'bad' : 'warn'}>
+            {powerNote.text}
+          </Panel>
+        ) : null}
+      </Card>
+
       {/*
         The ground mast. The pod has one radio, so collecting from the station
         means leaving its own access point — which looks exactly like the pod
@@ -361,8 +406,10 @@ export default function SyncScreen() {
           {tr('The station standing in your field does not talk to this phone. The pod fetches from it, and everything the station measures reaches you through an advisory. Air temperature and soil readings come from here; so does the sticky trap photo.')}
         </Muted>
 
-        <Panel label={tr('Not yet exercised on the device')} tone="warn">
-          {tr('The hardware team have not yet run this against the real Jetson. It is built to the contract and may work first time. If it fails, that is where to look before suspecting the phone.')}
+        {/* The pod collects from the station by itself at Start and at Stop, so
+            there is no button for it here. This only asks what the pod last did. */}
+        <Panel label={tr('Collected automatically')} tone="neutral">
+          {tr('The pod collects from the field station by itself when a scan starts and when it stops. There is nothing to press.')}
         </Panel>
 
         <Pressable
@@ -374,32 +421,9 @@ export default function SyncScreen() {
           </Text>
         </Pressable>
 
-        <Pressable
-          onPress={async () => {
-            setMastNote(null);
-            try {
-              const r = await triggerMastSync();
-              setMastNote({
-                text: tr('The pod is going to collect from the field station now. It will drop its own Wi-Fi for about {s} seconds and this phone will lose it. That is expected. Wait, then pull again.', { s: r.expected_ap_downtime_s }),
-                bad: false,
-              });
-            } catch (e) {
-              setMastNote({ text: e instanceof Error ? e.message : String(e), bad: true });
-            }
-          }}
-          style={({ pressed }) => [s.button, s.buttonSecondary, pressed && { opacity: 0.6 }]}
-        >
-          <Text style={[type.label, { color: color.secondaryForeground }]}>
-            {tr("Collect from the field station now")}
-          </Text>
-        </Pressable>
-
-        {mastNote ? (
-          <Panel
-            label={mastNote.bad ? tr('Could not do that') : tr('Pod is going offline briefly')}
-            tone={mastNote.bad ? 'bad' : 'warn'}
-          >
-            {mastNote.text}
+        {mastError ? (
+          <Panel label={tr('Could not do that')} tone="bad">
+            {mastError}
           </Panel>
         ) : null}
 
@@ -532,6 +556,18 @@ export default function SyncScreen() {
           {tr('The replica is seeded with six sample advisories so the app renders a full history with no pod present. Five are invented and are labelled SAMPLE DATA everywhere they appear. The sixth is the advisory the hardware team captured from the real device on 19 September, kept byte for byte.')}
         </Muted>
 
+        {/* A scan from a recorded crop video, for showing the app with no crop
+            in front of the pod. The report that comes back says it is a replay. */}
+        <Pressable
+          onPress={() => setReplaySheet(true)}
+          accessibilityRole="button"
+          style={({ pressed }) => [s.button, pressed && { opacity: 0.7 }]}
+        >
+          <Text style={[type.label, { color: color.primaryForeground }]}>
+            {tr('Demo: replay crop video')}
+          </Text>
+        </Pressable>
+
         {/* The production guard, and the switch that turns it off. On the
             screen rather than in a build flag, because a reader needs to be
             able to see that it is currently off. */}
@@ -597,6 +633,18 @@ export default function SyncScreen() {
           </Text>
         </Pressable>
       </Card>
+
+      <StartScanSheet visible={replaySheet} source="replay" onClose={() => setReplaySheet(false)} />
+      <ConfirmDialog
+        visible={confirmShutdown}
+        title={tr('Shut down the pod?')}
+        body={tr('If a scan is running it will be stopped and saved first. Then the pod switches itself off. To use it again you will have to switch it on by hand.')}
+        confirmLabel={tr('Shut down')}
+        cancelLabel={tr('Cancel')}
+        busy={shuttingDown}
+        onConfirm={() => void shutDown()}
+        onCancel={() => setConfirmShutdown(false)}
+      />
     </ScrollView>
   );
 }
