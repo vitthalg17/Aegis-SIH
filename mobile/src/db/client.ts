@@ -102,9 +102,19 @@ const MIGRATIONS: string[] = [
 ];
 
 /** Opens the replica and brings it up to the current schema version. */
-export async function getDb(): Promise<SQLite.SQLiteDatabase> {
-  if (handle) return handle;
+export function getDb(): Promise<SQLite.SQLiteDatabase> {
+  // The promise is stored, not the database, so two callers arriving before the
+  // first open finishes share one open and one run of the migrations.
+  if (!handle) {
+    handle = openAndMigrate().catch((err) => {
+      handle = null; // a failed open must be retried, not remembered
+      throw err;
+    });
+  }
+  return handle;
+}
 
+async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
   const db = await SQLite.openDatabaseAsync(DB_NAME);
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
 
@@ -119,7 +129,6 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase> {
     await db.execAsync(`PRAGMA user_version = ${v + 1}`);
   }
 
-  handle = db;
   return db;
 }
 
