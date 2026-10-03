@@ -166,7 +166,7 @@ Pod sends codes. The app owns the wording (English + Hindi).
 | `POD_HOT` | Nano temperature > 80 °C | Pod is getting hot. Keep it out of direct sun. |
 | `STORAGE_LOW` | < 500 MB free | Pod storage almost full. |
 | `STORAGE_CARD_MISSING` | SD card not mounted (saving to internal memory) | Storage card not found. Saving to the pod's internal memory. |
-| *(app-side)* pod not answering for 6 s | — | Phone is too far from the pod. The pod is still scanning. Walk closer to the pod to reconnect. |
+| *(app-side)* pod not answering for 6 s | — | Can't reach the pod. If you walked away from it, walk closer. If it lost power, switch it on. The walk so far is saved. |
 | *(app-side)* phone battery < 20 % | — | Phone battery low ({n}%). Charge soon. |
 | **Alert** (vibrate) | ≥3 frames agree on the same disease of the declared crop within 6 s; 15 s cooldown per disease | Possible {disease}. Check this plant by eye. |
 

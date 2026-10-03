@@ -21,8 +21,8 @@ export const WALK: Record<string, string> = {
   "Storage card not found. Saving to the pod's internal memory.":
     'स्टोरेज कार्ड नहीं मिला। पॉड की अपनी मेमोरी में सहेजा जा रहा है।',
   'Pod notice: {code}': 'पॉड की सूचना: {code}',
-  'Phone is too far from the pod. The pod is still scanning. Walk closer to the pod to reconnect.':
-    'फ़ोन पॉड से बहुत दूर है। पॉड अभी भी स्कैन कर रहा है। फिर से जुड़ने के लिए पॉड के पास आएँ।',
+  "Can't reach the pod. If you walked away from it, walk closer. If it lost power, switch it on. The walk so far is saved.":
+    'पॉड से जुड़ नहीं पा रहे। अगर आप उससे दूर चले गए हैं तो उसके पास आएँ। अगर उसकी बिजली चली गई है तो उसे चालू करें। अब तक की सैर सहेजी हुई है।',
   'Phone battery low ({n}%). Charge soon.': 'फ़ोन की बैटरी कम है ({n}%)। जल्दी चार्ज करें।',
 
   // Home: the pod, and Start

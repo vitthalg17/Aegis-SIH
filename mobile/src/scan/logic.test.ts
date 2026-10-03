@@ -90,7 +90,7 @@ test('pod far warning appears at exactly 6 s of silence, not before', () => {
   assert.equal(w[0].key, 'pod_far');
   assert.equal(
     w[0].text,
-    'Phone is too far from the pod. The pod is still scanning. Walk closer to the pod to reconnect.',
+    "Can't reach the pod. If you walked away from it, walk closer. If it lost power, switch it on. The walk so far is saved.",
   );
 });
 

@@ -125,7 +125,7 @@ export function appWarnings(input: {
     out.push({
       key: 'pod_far',
       text: tr(
-        'Phone is too far from the pod. The pod is still scanning. Walk closer to the pod to reconnect.',
+        "Can't reach the pod. If you walked away from it, walk closer. If it lost power, switch it on. The walk so far is saved.",
       ),
     });
   }
