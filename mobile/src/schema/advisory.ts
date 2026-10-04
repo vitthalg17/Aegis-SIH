@@ -79,11 +79,11 @@ export type InferenceBackend = Open<'trt' | 'onnx' | 'mock'>;
  */
 export type InputStatus = Open<'OK' | 'PENDING_CALIBRATION' | 'MOCK_PROVISIONAL' | 'ABSENT'>;
 
-/** `POD` for pod-borne sensors, `MAST` for the ground station. Never parsed. */
-export type SourceNode = Open<'POD' | 'MAST'>;
+/** `POD` for pod-borne sensors, `MAST` for the ground station, `PHONE` for the farmer's phone. Never parsed. */
+export type SourceNode = Open<'POD' | 'MAST' | 'PHONE'>;
 
 export type AdvisoryInput = {
-  name: Open<'pod_camera_rgb' | 'pod_gps' | 'pod_thermal'>;
+  name: Open<'pod_camera_rgb' | 'pod_gps' | 'pod_thermal' | 'phone_gps'>;
   source_node: SourceNode;
   status: InputStatus;
 };
@@ -692,6 +692,23 @@ export const SUPPORTED_SCHEMA_VERSIONS = ['1.0'] as const;
  */
 export function isReplay(advisory: { replay?: boolean } | null | undefined): boolean {
   return advisory?.replay !== false;
+}
+
+/**
+ * The pod's GPS input on a report whose positions came from the phone.
+ *
+ * The pod's receiver was not what this report was built from, so the input is
+ * "not used" rather than "not connected". Keyed on `gps.source`, so an older
+ * advisory without it keeps the status the pod gave. A simulated sensor still
+ * says SIMULATED, which matters more.
+ */
+export function isPhoneGpsPod(
+  input: { name: string; status: string },
+  gpsSource?: string | null,
+): boolean {
+  return (
+    input.name === 'pod_gps' && input.status !== 'MOCK_PROVISIONAL' && gpsSource === 'phone_gps'
+  );
 }
 
 /** ISO-8601, UTC, Z suffix, second resolution. No offsets, no epoch seconds. */

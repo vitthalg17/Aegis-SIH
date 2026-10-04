@@ -195,7 +195,7 @@ export default function AdvisoryScreen() {
       </TileGrid>
 
       <Group eyebrow={tr('About this scan')}>
-        <InputsCard inputs={a.inputs} thermalReason={a.thermal?.reason} />
+        <InputsCard inputs={a.inputs} thermalReason={a.thermal?.reason} gpsSource={a.gps?.source} />
         <ScanCard advisory={a} />
       </Group>
 

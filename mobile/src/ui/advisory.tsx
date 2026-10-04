@@ -41,6 +41,7 @@ import type {
   GrowthStage,
   InputStatus,
 } from '../schema/advisory.ts';
+import { isPhoneGpsPod } from '../schema/advisory.ts';
 import { DRIED_LEAF_CAVEAT, DRIED_LEAF_CLASS, describeClass } from '../schema/classes.ts';
 import { presentVerification, renderAction } from '../schema/templates.ts';
 import { sourceLine } from '../scan/report.ts';
@@ -434,6 +435,7 @@ export function GrowthStageCard({ stage }: { stage: GrowthStage }) {
 const INPUT_LABEL: Record<string, string> = {
   pod_thermal: msg('Pod thermal camera'),
   pod_gps: msg('Pod GPS'),
+  phone_gps: msg('Phone GPS'),
   pod_camera_rgb: msg('Pod colour camera'),
   pod_ndvi: msg('Pod infrared camera'),
   mast_ambient: msg('Air temp / humidity'),
@@ -445,6 +447,7 @@ const INPUT_LABEL: Record<string, string> = {
 const INPUT_SHORT: Record<string, string> = {
   pod_thermal: msg('Thermal'),
   pod_gps: msg('GPS'),
+  phone_gps: msg('Phone GPS'),
   pod_camera_rgb: msg('Camera'),
   pod_ndvi: msg('Infrared'),
   mast_ambient: msg('Air sensor'),
@@ -515,6 +518,16 @@ function isReplayThermal(input: AdvisoryInput, thermalReason?: string | null): b
 }
 
 /**
+ * `pod_gps` when the positions in this report came from the phone.
+ *
+ * The pod's receiver was not used, which is a statement about this report and
+ * not a fault, so it is neutral. Showing NOT CONNECTED would be wrong when the
+ * pod's GPS is fine, and a warning would send someone to fix nothing.
+ */
+const PHONE_GPS_LABEL = msg('NOT USED: PHONE GPS');
+const PHONE_GPS_BODY = msg("Positions in this report came from the phone's GPS.");
+
+/**
  * What the advisory was built from.
  *
  * Contract v1.0 trimmed this block to name, node and status — there are no
@@ -526,9 +539,11 @@ function isReplayThermal(input: AdvisoryInput, thermalReason?: string | null): b
 export function InputsCard({
   inputs,
   thermalReason,
+  gpsSource,
 }: {
   inputs: AdvisoryInput[];
   thermalReason?: string | null;
+  gpsSource?: string | null;
 }) {
   if (!inputs || inputs.length === 0) {
     return (
@@ -548,12 +563,15 @@ export function InputsCard({
   // Folded: how many sensors fed this scan, and what is up with the rest.
   // PENDING_CALIBRATION is not "not used" — its direct reading is real and on
   // this screen — so it is named for what it is rather than lumped in.
-  const working = inputs.filter((x) => x.status === 'OK' && !isReplayThermal(x, thermalReason));
+  const working = inputs.filter(
+    (x) => x.status === 'OK' && !isReplayThermal(x, thermalReason) && !isPhoneGpsPod(x, gpsSource),
+  );
   const notWorking = inputs
     .filter((x) => !working.includes(x))
     .map((x) => {
       const name = INPUT_SHORT[x.name] ? tr(INPUT_SHORT[x.name]) : x.name.replace(/_/g, ' ');
       if (isReplayThermal(x, thermalReason)) return tr('{name} not used (replay)', { name });
+      if (isPhoneGpsPod(x, gpsSource)) return tr('{name} not used (phone GPS)', { name });
       const state = INPUT_STATUS_SHORT[String(x.status)];
       return `${name} ${state ? tr(state) : String(x.status).toLowerCase()}`;
     });
@@ -573,13 +591,21 @@ export function InputsCard({
       {inputs.map((input, i) => {
         const status = input.status as InputStatus;
         const replayThermal = isReplayThermal(input, thermalReason);
+        const phoneGps = isPhoneGpsPod(input, gpsSource);
         const label = replayThermal
           ? tr(REPLAY_THERMAL_LABEL)
-          : INPUT_STATUS_LABEL[status]
-            ? tr(INPUT_STATUS_LABEL[status])
-            : String(status).replace(/_/g, ' ');
-        const tone: Tone = replayThermal ? 'neutral' : (INPUT_STATUS_TONE[status] ?? 'bad');
-        const bodyEn = replayThermal ? REPLAY_THERMAL_BODY : INPUT_STATUS_BODY[status];
+          : phoneGps
+            ? tr(PHONE_GPS_LABEL)
+            : INPUT_STATUS_LABEL[status]
+              ? tr(INPUT_STATUS_LABEL[status])
+              : String(status).replace(/_/g, ' ');
+        const tone: Tone =
+          replayThermal || phoneGps ? 'neutral' : (INPUT_STATUS_TONE[status] ?? 'bad');
+        const bodyEn = replayThermal
+          ? REPLAY_THERMAL_BODY
+          : phoneGps
+            ? PHONE_GPS_BODY
+            : INPUT_STATUS_BODY[status];
         const body = bodyEn ? tr(bodyEn) : undefined;
         return (
           <View key={`${input.name}-${i}`}>
@@ -590,7 +616,11 @@ export function InputsCard({
                   {INPUT_LABEL[input.name] ? tr(INPUT_LABEL[input.name]) : input.name.replace(/_/g, ' ')}
                 </Text>
                 <Text style={[type.valueSmall, { color: color.fgSubtle, marginTop: 3 }]}>
-                  {input.source_node === 'POD' ? tr('on the pod you carry') : tr('on the field station')}
+                  {input.source_node === 'POD'
+                    ? tr('on the pod you carry')
+                    : input.source_node === 'PHONE'
+                      ? tr("on the farmer's phone")
+                      : tr('on the field station')}
                 </Text>
               </View>
               <StatusChip label={label} tone={tone} />

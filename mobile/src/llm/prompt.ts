@@ -85,6 +85,8 @@ WHAT THE FIELDS MEAN
   Exception: if "thermal.reason" is REPLAY_THERMAL_NOT_OF_SCENE, pod_thermal is
   ABSENT because this is a replay and the thermal camera was not looking at the
   video's scene. The camera is connected; its reading was left out on purpose.
+  Likewise, if "gps.source" is phone_gps, the positions came from the farmer's
+  phone, so pod_gps was not used. Do not say the GPS is not connected.
 - "source" is how a number came to exist: measured, derived, or provisional.
   Do not describe a derived or provisional number as an observation.
 - Every action is advisory only. This system does not operate any equipment and
