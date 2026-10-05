@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+sync/.sync_state.json
+sync/.env
+*.tsbuildinfo
