@@ -7,16 +7,18 @@
  * stripe on the left repeats the verdict for a glance; the words carry it.
  */
 
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Link } from 'expo-router';
 
 import type { AdvisorySummary } from '../db/advisories.ts';
 import { DRIED_LEAF_CLASS, describeClass } from '../schema/classes.ts';
 import { recallPercent } from '../schema/reliability.ts';
-import { StatusChip, TONE } from './components.tsx';
+import { StatusChip } from './components.tsx';
 import type { Tone } from './components.tsx';
 import { formatWhen } from './advisory.tsx';
-import { color, radius, shadow, space, type } from './theme.ts';
+import { PressScale } from './motion.tsx';
+import { VerdictIcon } from './verdict-icon.tsx';
+import { color, radius, shadow, space, type, themed } from './theme.ts';
 import { tr } from '../i18n/tr.ts';
 
 /** The one-line verdict for a row. Never "healthy" for a dried-leaf call. */
@@ -76,8 +78,7 @@ function rowReliability(row: AdvisorySummary): string | null {
 export function ScanRow({ row, showField = true }: { row: AdvisorySummary; showField?: boolean }) {
   const verdict = rowVerdict(row);
   const reliability = rowReliability(row);
-  const t = TONE[verdict.tone];
-
+  
   // Only the exceptions get a chip. The verdict itself is the headline, so a
   // DISEASE / HEALTHY chip under it was saying the same thing twice.
   const chips: { label: string; tone: Tone }[] = [];
@@ -104,16 +105,12 @@ export function ScanRow({ row, showField = true }: { row: AdvisorySummary; showF
     // valid once expo-router generates its typed-route definitions, and it
     // escapes the id (advisory ids contain ':') without doing it by hand.
     <Link href={{ pathname: '/advisory/[id]', params: { id: row.advisoryId } }} asChild>
-      <Pressable accessibilityRole="button">
-        {({ pressed }) => (
-          <View
-            style={[
-              s.row,
-              !row.valid && { borderColor: color.destructiveBorder },
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <View style={[s.stripe, { backgroundColor: verdict.tone === 'neutral' ? color.border : t.fg }]} />
+      <PressScale accessibilityRole="button">
+        {(
+          <View style={[s.row, !row.valid && { borderColor: color.destructiveBorder }]}>
+            <View style={s.badge}>
+              <VerdictIcon tone={verdict.tone} size={38} />
+            </View>
             <View style={s.body}>
               <View style={s.head}>
                 <Text style={[type.cardTitle, { color: color.foreground, flex: 1 }]} numberOfLines={1}>
@@ -135,12 +132,12 @@ export function ScanRow({ row, showField = true }: { row: AdvisorySummary; showF
             </View>
           </View>
         )}
-      </Pressable>
+      </PressScale>
     </Link>
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => StyleSheet.create({
   row: {
     flexDirection: 'row',
     backgroundColor: color.card,
@@ -151,8 +148,8 @@ const s = StyleSheet.create({
     overflow: 'hidden',
     ...shadow.card,
   },
-  stripe: { width: 5 },
+  badge: { justifyContent: 'center', paddingLeft: space.md },
   body: { flex: 1, paddingVertical: space.md, paddingHorizontal: space.md },
   head: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: space.sm },
-});
+}));

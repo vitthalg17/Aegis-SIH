@@ -29,8 +29,9 @@ import { describeClass } from '../../src/schema/classes.ts';
 import { StatusChip, TONE } from '../../src/ui/components.tsx';
 import type { Tone } from '../../src/ui/components.tsx';
 import { ConfirmDialog } from '../../src/ui/confirm.tsx';
+import { useBarClearance } from '../../src/ui/floating-bar.ts';
 import { useStatusBarStyle } from '../../src/ui/status-bar.ts';
-import { color, radius, shadow, space, type } from '../../src/ui/theme.ts';
+import { color, radius, shadow, space, type, themed } from '../../src/ui/theme.ts';
 import { useLanguage } from '../../src/i18n/language.tsx';
 import { msg, tr } from '../../src/i18n/tr.ts';
 
@@ -52,7 +53,8 @@ export default function LiveScreen() {
   // Set once this screen has sent the farmer somewhere else, so the walk being
   // cleared afterwards does not also send them home.
   const leaving = useRef(false);
-  useStatusBarStyle('dark');
+  useStatusBarStyle('light');
+  const clearance = useBarClearance();
   useLanguage();
 
   const { phase, status } = session;
@@ -246,7 +248,7 @@ export default function LiveScreen() {
 
       {/* The Stop bar. Out of the scroll, so it is always under the thumb. */}
       {!ended ? (
-        <View style={[s.stopBar, { paddingBottom: insets.bottom + space.md }]}>
+        <View style={[s.stopBar, { paddingBottom: clearance }]}>
           <Pressable
             onPress={() => setConfirming(true)}
             disabled={finishing || stopping}
@@ -371,7 +373,7 @@ function Ended({
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => StyleSheet.create({
   headRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginBottom: space.md },
   banner: {
     borderWidth: 1,
@@ -459,4 +461,4 @@ const s = StyleSheet.create({
     letterSpacing: 3,
     color: color.destructiveForeground,
   },
-});
+}));

@@ -17,7 +17,8 @@ import { Children, createContext, useContext, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { color, font, radius, shadow, space, type } from './theme.ts';
+import { animateLayout } from './motion.tsx';
+import { color, font, radius, shadow, space, type, themed, live } from './theme.ts';
 import type { SourceKind, VerificationStatus } from '../schema/advisory.ts';
 import { presentVerification } from '../schema/templates.ts';
 import { currentLanguage, tr } from '../i18n/tr.ts';
@@ -28,13 +29,13 @@ import type { Language } from '../schema/templates.ts';
 export type Tone = 'neutral' | 'good' | 'warn' | 'bad' | 'unknown';
 
 /** border / surface / text for each tone, matching the site's chip variants. */
-export const TONE: Record<Tone, { border: string; bg: string; fg: string }> = {
+export const TONE: Record<Tone, { border: string; bg: string; fg: string }> = live(() => ({
   neutral: { border: color.border, bg: color.muted, fg: color.mutedForeground },
   good: { border: color.accent, bg: color.secondary, fg: color.secondaryForeground },
   warn: { border: color.warningBorder, bg: color.warningMuted, fg: color.warningForeground },
   bad: { border: color.destructiveBorder, bg: color.destructiveMuted, fg: color.destructive },
   unknown: { border: color.unknownBorder, bg: color.unknownSurface, fg: color.unknown },
-};
+}));
 
 // ---- Eyebrow --------------------------------------------------------------
 
@@ -272,7 +273,10 @@ function Tile({ spec, title, children }: { spec: TileSpec; title: string; childr
   return (
     <View style={[s.tile, { backgroundColor: bg, borderColor: t.border }, open && s.tileOpen]}>
       <Pressable
-        onPress={() => setOpen((o) => !o)}
+        onPress={() => {
+          animateLayout();
+          setOpen((o) => !o);
+        }}
         accessibilityRole="button"
         accessibilityLabel={`${title}: ${spec.value}${spec.unit ? ` ${spec.unit}` : ''}`}
         accessibilityState={{ expanded: open }}
@@ -334,7 +338,10 @@ export function Fold({
   return (
     <View>
       <Pressable
-        onPress={() => setOpen((o) => !o)}
+        onPress={() => {
+          animateLayout();
+          setOpen((o) => !o);
+        }}
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
         accessibilityHint={open ? tr('Hides the details') : tr('Shows the details')}
@@ -793,7 +800,7 @@ export function ChipRow({ children }: { children: ReactNode }) {
   return <View style={s.chipRow}>{children}</View>;
 }
 
-const s = StyleSheet.create({
+const s = themed(() => StyleSheet.create({
   eyebrow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -928,4 +935,4 @@ const s = StyleSheet.create({
     gap: space.sm,
   },
   divider: { height: 1, backgroundColor: color.border, marginVertical: space.sm },
-});
+}));

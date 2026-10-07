@@ -15,7 +15,7 @@ import { displayElapsed, formatTimer } from '../scan/logic.ts';
 import { dismissWalk, joinRunningWalk, useScanSession } from '../scan/session.ts';
 import { StatusChip } from './components.tsx';
 import { StartScanSheet } from './start-scan-sheet.tsx';
-import { color, radius, shadow, space, type } from './theme.ts';
+import { color, radius, shadow, space, type, themed } from './theme.ts';
 import { tr } from '../i18n/tr.ts';
 
 export function ScanPanel() {
@@ -165,7 +165,7 @@ export function ScanPanel() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => StyleSheet.create({
   card: {
     backgroundColor: color.card,
     borderRadius: radius.xl,
@@ -188,4 +188,4 @@ const s = StyleSheet.create({
   },
   goOff: { opacity: 0.4 },
   goText: { color: color.primaryForeground, fontSize: 16 },
-});
+}));

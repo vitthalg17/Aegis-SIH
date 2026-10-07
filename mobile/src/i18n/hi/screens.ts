@@ -64,7 +64,6 @@ export const SCREENS: Record<string, string> = {
   'Open scan ›': 'स्कैन खोलें ›',
 
   // Navigation
-  'Back to {where}': '{where} पर वापस',
   Back: 'वापस',
   'All scans': 'सभी स्कैन',
   Home: 'होम',
@@ -87,6 +86,11 @@ export const SCREENS: Record<string, string> = {
   // Profile
   'Your profile': 'आपकी प्रोफ़ाइल',
   'Settings for this phone.': 'इस फ़ोन की सेटिंग।',
+  'Changes every screen in the app.': 'ऐप की हर स्क्रीन बदल जाती है।',
+  Light: 'हल्का',
+  Dark: 'गहरा',
+  'Best in bright sun.': 'तेज़ धूप में सबसे अच्छा।',
+  'Easier on the eyes at night and indoors.': 'रात में और घर के अंदर आँखों को आराम देता है।',
   'Changes every screen in the app, including the advice. Works without internet.':
     'ऐप की हर स्क्रीन बदल जाती है, सलाह भी। बिना इंटरनेट के काम करता है।',
   'Technical messages from the pod, and the scan code on each scan, stay in English.':

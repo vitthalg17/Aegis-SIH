@@ -9,7 +9,7 @@
 
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { color, radius, shadow, space, type } from './theme.ts';
+import { color, radius, shadow, space, type, themed } from './theme.ts';
 
 export function ConfirmDialog({
   visible,
@@ -64,7 +64,7 @@ export function ConfirmDialog({
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(10,31,12,0.55)',
@@ -88,4 +88,4 @@ const s = StyleSheet.create({
   },
   cancel: { backgroundColor: color.secondary, borderWidth: 1, borderColor: color.accent },
   confirm: { backgroundColor: color.destructive },
-});
+}));

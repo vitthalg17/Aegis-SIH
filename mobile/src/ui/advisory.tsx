@@ -32,7 +32,7 @@ import {
 import type { Tone } from './components.tsx';
 import { EvidenceBar, Meter, Stat } from './charts.tsx';
 import { ProgressBar, SproutIcon } from './tiles.tsx';
-import { color, radius, shadow, space, type } from './theme.ts';
+import { color, radius, shadow, space, type, themed } from './theme.ts';
 import type {
   Advisory,
   AdvisoryInput,
@@ -45,6 +45,7 @@ import { isPhoneGpsPod } from '../schema/advisory.ts';
 import { DRIED_LEAF_CAVEAT, DRIED_LEAF_CLASS, describeClass } from '../schema/classes.ts';
 import { presentVerification, renderAction } from '../schema/templates.ts';
 import { sourceLine } from '../scan/report.ts';
+import { VerdictIcon } from './verdict-icon.tsx';
 import type { Language } from '../schema/templates.ts';
 import type { AdvisoryOrigin } from '../db/advisories.ts';
 import type { Violation } from '../schema/validate.ts';
@@ -219,17 +220,22 @@ export function CropHealthCard({
       {/* The band carries the state colour; the words carry the state. Never
           one without the other — this has to read in sun and in grayscale. */}
       <View style={[s.verdictBand, { backgroundColor: t.bg, borderBottomColor: t.border }]}>
-        <Text style={[type.title, { color: t.fg }]}>
-          {tr(HEALTH_HEADLINE[health.state] ?? String(health.state))}
-        </Text>
-        {described ? (
-          <Text style={[type.label, { color: t.fg, marginTop: 4 }]}>{described.label}</Text>
-        ) : health.crop ? (
-          <Text style={[type.label, { color: t.fg, marginTop: 4 }]}>
-            {health.crop.charAt(0).toUpperCase() + health.crop.slice(1)}
-          </Text>
-        ) : null}
-        <Text style={[type.small, { color: t.fg, marginTop: 6, opacity: 0.9 }]}>
+        <View style={s.verdictHead}>
+          <VerdictIcon tone={tone} size={52} plate={color.card} />
+          <View style={{ flex: 1 }}>
+            <Text style={[type.title, { color: t.fg, fontSize: 22, lineHeight: 27 }]}>
+              {tr(HEALTH_HEADLINE[health.state] ?? String(health.state))}
+            </Text>
+            {described ? (
+              <Text style={[type.label, { color: t.fg, marginTop: 3 }]}>{described.label}</Text>
+            ) : health.crop ? (
+              <Text style={[type.label, { color: t.fg, marginTop: 3 }]}>
+                {health.crop.charAt(0).toUpperCase() + health.crop.slice(1)}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+        <Text style={[type.small, { color: t.fg, marginTop: space.md, opacity: 0.9 }]}>
           {tr(HEALTH_BODY[health.state] ?? '')}
         </Text>
       </View>
@@ -990,7 +996,7 @@ function formatDuration(seconds: number): string {
   return tr('{m} min walk', { m: Math.round(seconds / 60) });
 }
 
-const s = StyleSheet.create({
+const s = themed(() => StyleSheet.create({
   banner: {
     borderWidth: 1,
     borderRadius: radius.md,
@@ -1027,6 +1033,7 @@ const s = StyleSheet.create({
     marginBottom: space.md,
     ...shadow.card,
   },
+  verdictHead: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   verdictBand: {
     paddingHorizontal: space.lg,
     paddingVertical: space.lg,
@@ -1047,4 +1054,4 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

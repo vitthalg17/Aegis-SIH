@@ -164,6 +164,7 @@ export type SyncKey =
   | 'validated_against'
   /** The language the farmer picked on the Profile screen: 'en' or 'hi'. */
   | 'app_language'
+  | 'app_theme'
   /**
    * Which LLM provider the Profile screen is set to, and each provider's key,
    * model and address, as JSON. Stays in the app's private storage on this

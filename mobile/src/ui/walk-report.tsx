@@ -38,7 +38,7 @@ import type { Tone } from './components.tsx';
 import { extentMetres, pickScaleMetres, toMetres, toUnitSquare } from './field-geometry.ts';
 import { SatelliteMap } from './satellite-map.tsx';
 import type { GeoPoint } from './satellite-map.tsx';
-import { chart, color, radius, space, type } from './theme.ts';
+import { chart, color, radius, space, type, themed, live } from './theme.ts';
 import { msg, tr } from '../i18n/tr.ts';
 
 /** Everything the walk report adds above the standard advisory sections. */
@@ -59,12 +59,12 @@ const CROP_LABEL: Record<string, string> = {
   sugarcane: msg('Sugarcane'),
 };
 
-const STRIP_FILL: Record<ReportTone, string> = {
+const STRIP_FILL: Record<ReportTone, string> = live(() => ({
   good: chart.fill.good,
   warn: chart.fill.warn,
   bad: chart.fill.bad,
   unknown: chart.muted,
-};
+}));
 
 // ---- 1 and 2: the summary and the strip -----------------------------------
 
@@ -381,7 +381,7 @@ function Value({ v, unit, digits }: { v: number | null | undefined; unit: string
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => StyleSheet.create({
   headline: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginBottom: space.md },
   tiles: { flexDirection: 'row', gap: space.sm },
   tile: {
@@ -399,4 +399,4 @@ const s = StyleSheet.create({
   stripAxis: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   item: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm, paddingVertical: space.md },
   itemRule: { borderTopWidth: 1, borderTopColor: color.border },
-});
+}));

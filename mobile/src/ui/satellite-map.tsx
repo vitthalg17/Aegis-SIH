@@ -75,7 +75,7 @@ function IframeView({
 const WebView = (Platform.OS === 'web' ? IframeView : NativeWebView) as typeof NativeWebView;
 
 import type { Tone } from './components.tsx';
-import { chart, color, radius, space, type } from './theme.ts';
+import { chart, color, radius, space, type, themed } from './theme.ts';
 import { tr } from '../i18n/tr.ts';
 
 export type GeoPoint = {
@@ -209,7 +209,7 @@ export function SatelliteMap({
           hitSlop={8}
           style={s.expand}
         >
-          <Text style={[type.label, { color: color.primaryForeground }]}>{tr('Full screen')}</Text>
+          <Text style={[type.label, { color: '#FFFFFF' }]}>{tr('Full screen')}</Text>
         </Pressable>
       ) : null}
       <Modal visible={expanded} animationType="slide" onRequestClose={() => setExpanded(false)}>
@@ -234,7 +234,7 @@ export function SatelliteMap({
             hitSlop={8}
             style={[s.close, { top: insets.top + space.sm }]}
           >
-            <Text style={[type.label, { color: color.primaryForeground }]}>{tr('Close')}</Text>
+            <Text style={[type.label, { color: '#FFFFFF' }]}>{tr('Close')}</Text>
           </Pressable>
         </View>
       </Modal>
@@ -337,7 +337,7 @@ function buildHtml(
 </body></html>`;
 }
 
-const s = StyleSheet.create({
+const s = themed(() => StyleSheet.create({
   frame: {
     borderRadius: radius.lg,
     overflow: 'hidden',
@@ -371,6 +371,6 @@ const s = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(248,245,240,0.85)',
+    backgroundColor: color.background + 'D9',
   },
-});
+}));

@@ -46,12 +46,14 @@ import { PestCard } from '../../../src/ui/pest.tsx';
 import { VegetationCard } from '../../../src/ui/vegetation.tsx';
 import { IrrigationCard, NdviCard, ThermalCard } from '../../../src/ui/water.tsx';
 import { Card, Group, Muted, TileGrid } from '../../../src/ui/components.tsx';
+import { Reveal } from '../../../src/ui/motion.tsx';
 import { ExplanationCard } from '../../../src/ui/explanation.tsx';
 import { WalkReport } from '../../../src/ui/walk-report.tsx';
 import { isWalkReport } from '../../../src/scan/report.ts';
 import { missingBlocks } from '../../../src/schema/validate.ts';
 import type { Language } from '../../../src/schema/templates.ts';
 import { fieldIdFromAdvisoryId } from '../../../src/schema/advisory.ts';
+import { useBarClearance } from '../../../src/ui/floating-bar.ts';
 import { useStatusBarStyle } from '../../../src/ui/status-bar.ts';
 import { color, space, type } from '../../../src/ui/theme.ts';
 import { useLanguage } from '../../../src/i18n/language.tsx';
@@ -74,7 +76,8 @@ export default function AdvisoryScreen() {
   // still flip it for one scan, for reading the same advice in the other.
   useEffect(() => setLanguage(appLanguage), [appLanguage]);
   const insets = useSafeAreaInsets();
-  useStatusBarStyle('dark');
+  useStatusBarStyle('light');
+  const clearance = useBarClearance();
 
   useEffect(() => {
     if (!id) return;
@@ -109,7 +112,7 @@ export default function AdvisoryScreen() {
     return (
       <ScrollView
         style={{ backgroundColor: color.background }}
-        contentContainerStyle={{ padding: space.lg, paddingBottom: insets.bottom + space.xl }}
+        contentContainerStyle={{ padding: space.lg, paddingBottom: clearance }}
       >
         <OriginBanner origin={stored.origin} />
         <Text style={[type.title, { color: color.foreground }]}>{tr('This advisory cannot be shown')}</Text>
@@ -142,7 +145,7 @@ export default function AdvisoryScreen() {
   return (
     <ScrollView
       style={{ backgroundColor: color.background }}
-      contentContainerStyle={{ padding: space.lg, paddingBottom: space.xl }}
+      contentContainerStyle={{ padding: space.lg, paddingBottom: clearance }}
     >
       {/* The header names the field, so the screen title does not have to. */}
       <Stack.Screen options={{ title: heading }} />
@@ -165,12 +168,16 @@ export default function AdvisoryScreen() {
       {isWalkReport(a) ? <WalkReport advisory={a} /> : null}
 
       {/* The one sentence a farmer came for. */}
-      <CropHealthCard health={a.crop_health} topClass={topFinding(a)} />
+      <Reveal index={0}>
+        <CropHealthCard health={a.crop_health} topClass={topFinding(a)} />
+      </Reveal>
 
       {/* The language switch lives in this card's header, because it changes
           this card and nothing else — and a farmer who cannot read the English
           needs to find it before giving up on the screen. */}
-      <ActionsCard actions={a.actions} language={language} onLanguageChange={setLanguage} />
+      <Reveal index={1}>
+        <ActionsCard actions={a.actions} language={language} onLanguageChange={setLanguage} />
+      </Reveal>
 
       {/* After the pod's own actions, never instead of them. Renders nothing
           on a build with no model endpoint. */}
@@ -185,6 +192,7 @@ export default function AdvisoryScreen() {
 
       {/* Weather-app style: one tile per reading, a big figure and a small
           graphic. A tap widens the tile and opens its full card. */}
+      <Reveal index={2}>
       <TileGrid eyebrow={tr('Field readings')} title={tr('What else the pod measured')}>
         <ThermalCard thermal={a.thermal} />
         <IrrigationCard irrigation={a.irrigation} />
@@ -193,6 +201,7 @@ export default function AdvisoryScreen() {
         <GrowthStageCard stage={a.growth_stage} />
         <PestCard pest={a.pest} />
       </TileGrid>
+      </Reveal>
 
       <Group eyebrow={tr('About this scan')}>
         <InputsCard inputs={a.inputs} thermalReason={a.thermal?.reason} gpsSource={a.gps?.source} />

@@ -34,7 +34,7 @@ import { CROPS } from '../scan/logic.ts';
 import type { Crop, ScanSource } from '../scan/logic.ts';
 import { askForLocation, beginWalk, joinRunningWalk } from '../scan/session.ts';
 import { Panel } from './components.tsx';
-import { color, radius, space, type } from './theme.ts';
+import { color, radius, space, type, themed } from './theme.ts';
 import { msg, tr } from '../i18n/tr.ts';
 
 const CROP_LABEL: Record<Crop, string> = {
@@ -226,7 +226,7 @@ export function StartScanSheet({
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(10,31,12,0.55)', justifyContent: 'flex-end' },
   dismiss: { flex: 1 },
   sheet: {
@@ -282,4 +282,4 @@ const s = StyleSheet.create({
   },
   goOff: { opacity: 0.4 },
   cancel: { alignItems: 'center', paddingVertical: space.md, marginTop: space.xs },
-});
+}));

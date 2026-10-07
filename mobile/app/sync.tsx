@@ -59,8 +59,9 @@ import {
 } from '../src/ui/components.tsx';
 import { ConfirmDialog } from '../src/ui/confirm.tsx';
 import { StartScanSheet } from '../src/ui/start-scan-sheet.tsx';
+import { useBarClearance } from '../src/ui/floating-bar.ts';
 import { useStatusBarStyle } from '../src/ui/status-bar.ts';
-import { color, radius, space, type } from '../src/ui/theme.ts';
+import { color, radius, space, type, themed } from '../src/ui/theme.ts';
 import { useLanguage } from '../src/i18n/language.tsx';
 import { msg, tr } from '../src/i18n/tr.ts';
 
@@ -90,7 +91,8 @@ export default function SyncScreen() {
   const [paste, setPaste] = useState('');
   const [importNote, setImportNote] = useState<{ text: string; bad: boolean } | null>(null);
   const insets = useSafeAreaInsets();
-  useStatusBarStyle('dark');
+  useStatusBarStyle('light');
+  const clearance = useBarClearance();
   useLanguage();
 
   useEffect(() => {
@@ -156,7 +158,7 @@ export default function SyncScreen() {
   return (
     <ScrollView
       style={{ backgroundColor: color.background }}
-      contentContainerStyle={{ padding: space.lg, paddingBottom: insets.bottom + space.xl }}
+      contentContainerStyle={{ padding: space.lg, paddingBottom: clearance }}
     >
       <View style={s.statRow}>
         <StatCard value={String(count)} caption={tr('Advisories held on this phone')} highlight />
@@ -658,7 +660,7 @@ function formatSeconds(s: number): string {
   return tr('{n} days', { n: Math.round(s / 86400) });
 }
 
-const s = StyleSheet.create({
+const s = themed(() => StyleSheet.create({
   statRow: { flexDirection: 'row', gap: space.md, marginBottom: space.md },
   input: {
     marginTop: space.md,
@@ -686,4 +688,4 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: color.destructiveBorder,
   },
-});
+}));
